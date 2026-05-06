@@ -59,7 +59,7 @@ export default function MapView() {
     <div className="flex w-full h-screen bg-slate-50 overflow-hidden relative font-sans text-slate-800">
       
       {/* Botones Flotantes Inferiores Derechos */}
-      <div className="absolute bottom-6 right-6 md:bottom-8 md:right-8 z-[1000] flex flex-col gap-3 md:gap-4 items-end">
+      <div className="absolute bottom-24 right-4 md:bottom-8 md:right-8 z-[1000] flex flex-col gap-3 md:gap-4 items-end">
         
         {/* Botón Ver Reportes (Solo Móvil) */}
         <button 
