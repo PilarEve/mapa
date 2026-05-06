@@ -11,7 +11,7 @@ import FilterPanel from './FilterPanel';
 import SidebarReports from './SidebarReports';
 import HeatmapLayer from './HeatmapLayer';
 import ReportForm from './ReportForm';
-import { Plus, Menu, X } from 'lucide-react';
+import { Plus, ListFilter, X } from 'lucide-react';
 
 const ASUNCION_CENTER: [number, number] = [-25.2855, -57.6150];
 
@@ -58,22 +58,28 @@ export default function MapView() {
   return (
     <div className="flex w-full h-screen bg-slate-50 overflow-hidden relative font-sans text-slate-800">
       
-      {/* Botón Flotante para Menú Móvil */}
-      <button 
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="md:hidden absolute top-4 left-4 z-[2000] bg-white/90 backdrop-blur-md p-3 rounded-xl shadow-lg text-slate-700 transition-all hover:bg-white"
-      >
-        {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
-      </button>
+      {/* Botones Flotantes Inferiores Derechos */}
+      <div className="absolute bottom-6 right-6 md:bottom-8 md:right-8 z-[1000] flex flex-col gap-3 md:gap-4 items-end">
+        
+        {/* Botón Ver Reportes (Solo Móvil) */}
+        <button 
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className={`md:hidden bg-white text-slate-700 font-bold py-3.5 px-5 rounded-full shadow-[0_8px_20px_rgb(0,0,0,0.15)] flex items-center gap-2 transition-all transform active:scale-95 border border-slate-200 ${isSidebarOpen ? 'bg-slate-100' : ''}`}
+        >
+          {isSidebarOpen ? <X size={20} /> : <ListFilter size={20} />}
+          <span className="text-sm">{isSidebarOpen ? 'Cerrar Lista' : 'Ver Reportes'}</span>
+        </button>
 
-      {/* Botón Flotante para Nuevo Reporte */}
-      <button 
-        onClick={() => setShowReportForm(true)}
-        className="absolute bottom-6 right-6 md:bottom-8 md:right-8 z-[1000] bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-bold py-3 md:py-4 px-6 md:px-8 rounded-full shadow-2xl shadow-blue-500/30 flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 border border-blue-400/20"
-      >
-        <Plus size={22} className="drop-shadow-md" />
-        <span className="text-sm md:text-base drop-shadow-md">Nuevo Reporte</span>
-      </button>
+        {/* Botón Flotante para Nuevo Reporte */}
+        <button 
+          onClick={() => setShowReportForm(true)}
+          className="bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-bold py-3.5 px-6 md:py-4 md:px-8 rounded-full shadow-2xl shadow-blue-500/30 flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 border border-blue-400/20"
+        >
+          <Plus size={22} className="drop-shadow-md" />
+          <span className="text-sm md:text-base drop-shadow-md">Nuevo Reporte</span>
+        </button>
+
+      </div>
 
       {/* Overlay Oscuro para móvil cuando el sidebar está abierto */}
       {isSidebarOpen && (
