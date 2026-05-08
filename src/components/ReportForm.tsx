@@ -190,16 +190,33 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
 
           <div className="space-y-3">
             <label className="text-sm font-bold text-slate-600">Fotografía</label>
-            <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 flex flex-col items-center justify-center bg-slate-50 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer text-slate-500 group">
-              <div className="bg-white p-3 rounded-full shadow-sm mb-3 group-hover:scale-110 transition-transform">
-                <Camera size={24} className="text-slate-400 group-hover:text-blue-500" />
-              </div>
-              <span className="text-sm text-center font-medium">Haga clic para adjuntar evidencia gráfica</span>
+            <div className="relative border-2 border-dashed border-slate-300 rounded-2xl overflow-hidden bg-slate-50 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer group min-h-[150px] flex flex-col items-center justify-center">
+              {imageUrl ? (
+                <div className="w-full h-48 relative">
+                  <img 
+                    src={imageUrl} 
+                    alt="Vista previa" 
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span className="text-white text-xs font-bold bg-slate-900/60 px-3 py-1.5 rounded-full backdrop-blur-sm">Cambiar Imagen</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6 flex flex-col items-center justify-center text-slate-500">
+                  <div className="bg-white p-3 rounded-full shadow-sm mb-3 group-hover:scale-110 transition-transform">
+                    <Camera size={24} className="text-slate-400 group-hover:text-blue-500" />
+                  </div>
+                  <span className="text-sm text-center font-medium">Haga clic para adjuntar evidencia gráfica o tomar foto</span>
+                </div>
+              )}
+              
               <input 
                 type="file" 
                 id="file-upload"
-                className="hidden" 
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
                 accept="image/*"
+                capture="environment"
                 onChange={(e) => {
                   if(e.target.files && e.target.files[0]) {
                      const file = e.target.files[0];
@@ -208,9 +225,6 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
                   }
                 }}
               />
-              <label htmlFor="file-upload" className="w-full text-center cursor-pointer">
-                <span className="text-sm font-medium">Haga clic para adjuntar evidencia gráfica</span>
-              </label>
             </div>
             {imageUrl && <p className="text-xs text-green-600 mt-2 font-bold flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> Imagen adjuntada correctamente.</p>}
           </div>
