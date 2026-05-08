@@ -4,6 +4,8 @@ import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Report } from '../types/report';
 import { format } from 'date-fns';
+import Image from 'next/image';
+
 
 const getSeverityColor = (severity: Report['severity']) => {
   switch (severity) {
@@ -47,10 +49,13 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
         <div className="w-64 p-0">
           {report.imageUrl && (
             <div className="-mx-5 -mt-4 mb-3">
-              <img 
+              <Image 
                 src={report.imageUrl} 
                 alt="Imagen del reporte" 
+                width={256}
+                height={128}
                 className="w-full h-32 object-cover rounded-t-lg"
+                unoptimized
               />
             </div>
           )}

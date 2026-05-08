@@ -21,9 +21,9 @@ export default function FilterPanel({
 }: FilterPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Al cargar, en escritorio lo abrimos por defecto, en móvil cerrado
   useEffect(() => {
-    if (window.innerWidth >= 768) {
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsExpanded(true);
     }
   }, []);

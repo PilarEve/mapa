@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -11,18 +11,59 @@ import FilterPanel from './FilterPanel';
 import SidebarReports from './SidebarReports';
 import HeatmapLayer from './HeatmapLayer';
 import ReportForm from './ReportForm';
-import { Plus, ListFilter, X } from 'lucide-react';
+import { Plus, ListFilter, X, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+
 
 const ASUNCION_CENTER: [number, number] = [-25.2855, -57.6150];
 
 export default function MapView() {
-  const [reports, setReports] = useState<Report[]>(mockReports);
+  const [reports, setReports] = useState<Report[]>([]); // Inicializamos vacío
+  const [loading, setLoading] = useState(true);
   const [selectedSeverities, setSelectedSeverities] = useState<Severity[]>(['bajo', 'medio', 'alto', 'critico']);
   const [selectedStatus, setSelectedStatus] = useState<string>('todos');
   const [isHeatmapVisible, setIsHeatmapVisible] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
   const [mapRef, setMapRef] = useState<L.Map | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Para móviles
+
+  // Cargar reportes desde Supabase al montar el componente
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('reportes')
+          .select('*')
+          .order('creado_en', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching reports:', error);
+          setReports(mockReports);
+        } else if (data) {
+          // Mapeamos los datos de la DB a nuestro formato de Report
+          const mappedReports: Report[] = data.map(dbReport => ({
+            id: dbReport.id,
+            lat: Number(dbReport.latitud),
+            lng: Number(dbReport.longitud),
+            description: dbReport.descripcion || 'Sin descripción',
+            severity: (dbReport.nivel_agua_categoria || 'bajo') as Severity,
+            dateTime: dbReport.creado_en || new Date().toISOString(),
+            imageUrl: dbReport.imagen_url || undefined,
+            status: (dbReport.estado || 'pendiente') as Report['status']
+          }));
+          setReports(mappedReports);
+        }
+      } catch (err) {
+        console.error('Unexpected error:', err);
+        setReports(mockReports);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReports();
+  }, []);
 
   const filteredReports = useMemo(() => {
     return reports.filter(report => {
@@ -37,15 +78,48 @@ export default function MapView() {
     setSelectedStatus(status);
   };
 
-  const handleAddReport = (newReportData: Omit<Report, 'id' | 'status'>) => {
-    const newReport: Report = {
-      ...newReportData,
-      id: `R${Math.floor(Math.random() * 10000)}`,
-      status: 'pendiente'
-    };
-    setReports(prev => [newReport, ...prev]);
-    setShowReportForm(false);
-    if (mapRef) mapRef.setView([newReport.lat, newReport.lng], 15);
+  const handleAddReport = async (newReportData: Omit<Report, 'id' | 'status'>) => {
+    try {
+      // Mapeamos del formato frontend al formato de la tabla en Supabase
+      const newReportToInsert = {
+        latitud: newReportData.lat,
+        longitud: newReportData.lng,
+        descripcion: newReportData.description,
+        nivel_agua_categoria: newReportData.severity,
+        imagen_url: newReportData.imageUrl || null,
+        tipo_evento: 'inundacion', // Valor por defecto
+        estado: 'pendiente'
+      };
+
+      const { data, error } = await supabase
+        .from('reportes')
+        .insert([newReportToInsert])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        // Mapeamos el resultado de vuelta al formato frontend
+        const mappedNewReport: Report = {
+          id: data.id,
+          lat: Number(data.latitud),
+          lng: Number(data.longitud),
+          description: data.descripcion || 'Sin descripción',
+          severity: (data.nivel_agua_categoria || 'bajo') as Severity,
+          dateTime: data.creado_en || new Date().toISOString(),
+          imageUrl: data.imagen_url || undefined,
+          status: (data.estado || 'pendiente') as Report['status']
+        };
+
+        setReports(prev => [mappedNewReport, ...prev]);
+        setShowReportForm(false);
+        if (mapRef) mapRef.setView([mappedNewReport.lat, mappedNewReport.lng], 15);
+      }
+    } catch (error) {
+      console.error('Error saving report:', error);
+      alert('Hubo un error al guardar el reporte. Por favor intente de nuevo.');
+    }
   };
 
   const handleSelectReportFromSidebar = (report: Report) => {
@@ -141,6 +215,13 @@ export default function MapView() {
           onClose={() => setShowReportForm(false)} 
           onSubmit={handleAddReport} 
         />
+      )}
+      {/* Indicador de Carga */}
+      {loading && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[3000] bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-lg border border-blue-100 flex items-center gap-2">
+          <Loader2 size={18} className="text-blue-600 animate-spin" />
+          <span className="text-sm font-medium text-slate-600">Actualizando datos...</span>
+        </div>
       )}
     </div>
   );
