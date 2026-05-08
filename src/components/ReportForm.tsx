@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { Severity, Report } from '../types/report';
-import { MapPin, Camera, X } from 'lucide-react';
+import { MapPin, Camera, X, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+
 
 interface ReportFormProps {
   onClose: () => void;
@@ -15,7 +17,9 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
   const [description, setDescription] = useState<string>('');
   const [severity, setSeverity] = useState<Severity>('medio');
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleGetLocation = () => {
     setIsLocating(true);
@@ -38,21 +42,61 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!lat || !lng || !description) {
       alert("Por favor complete los campos obligatorios.");
       return;
     }
 
-    onSubmit({
-      lat: parseFloat(lat),
-      lng: parseFloat(lng),
-      description,
-      severity,
-      dateTime: new Date().toISOString(),
-      imageUrl: imageUrl || "https://placehold.co/400x300/EEE/31343C?font=montserrat&text=Nueva+Foto"
-    });
+    setIsSubmitting(true);
+    let finalImageUrl = imageUrl;
+
+    try {
+      // 1. Subir imagen a Supabase Storage si existe un archivo seleccionado
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Math.random()}-${Date.now()}.${fileExt}`;
+        const filePath = `reportes/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('reportes')
+          .upload(filePath, imageFile);
+
+        if (uploadError) throw uploadError;
+
+        // 2. Obtener la URL pública
+        const { data: { publicUrl } } = supabase.storage
+          .from('reportes')
+          .getPublicUrl(filePath);
+
+        finalImageUrl = publicUrl;
+      }
+
+      // 3. Enviar datos al componente padre
+      onSubmit({
+        lat: parseFloat(lat),
+        lng: parseFloat(lng),
+        description,
+        severity,
+        dateTime: new Date().toISOString(),
+        imageUrl: finalImageUrl || undefined
+      });
+    } catch (error) {
+      console.error('Error al subir la imagen:', error);
+      alert('Error al subir la imagen. El reporte se enviará sin imagen.');
+      
+      onSubmit({
+        lat: parseFloat(lat),
+        lng: parseFloat(lng),
+        description,
+        severity,
+        dateTime: new Date().toISOString(),
+        imageUrl: undefined
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -153,14 +197,20 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
               <span className="text-sm text-center font-medium">Haga clic para adjuntar evidencia gráfica</span>
               <input 
                 type="file" 
+                id="file-upload"
                 className="hidden" 
                 accept="image/*"
                 onChange={(e) => {
                   if(e.target.files && e.target.files[0]) {
-                     setImageUrl(URL.createObjectURL(e.target.files[0]));
+                     const file = e.target.files[0];
+                     setImageFile(file);
+                     setImageUrl(URL.createObjectURL(file));
                   }
                 }}
               />
+              <label htmlFor="file-upload" className="w-full text-center cursor-pointer">
+                <span className="text-sm font-medium">Haga clic para adjuntar evidencia gráfica</span>
+              </label>
             </div>
             {imageUrl && <p className="text-xs text-green-600 mt-2 font-bold flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> Imagen adjuntada correctamente.</p>}
           </div>
@@ -168,9 +218,15 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
           <div className="pt-6 pb-2">
             <button 
               type="submit"
-              className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-4 px-6 rounded-xl shadow-[0_8px_20px_rgb(37,99,235,0.3)] hover:shadow-[0_8px_25px_rgb(37,99,235,0.4)] transition-all transform hover:-translate-y-0.5 active:translate-y-0"
+              disabled={isSubmitting}
+              className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-4 px-6 rounded-xl shadow-[0_8px_20px_rgb(37,99,235,0.3)] hover:shadow-[0_8px_25px_rgb(37,99,235,0.4)] transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
             >
-              Confirmar y Enviar Reporte
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="animate-spin" size={20} />
+                  Enviando reporte...
+                </>
+              ) : 'Confirmar y Enviar Reporte'}
             </button>
           </div>
         </form>
