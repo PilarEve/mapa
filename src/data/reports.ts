@@ -2,6 +2,16 @@ import { Report } from '../types/report';
 
 export const mockReports: Report[] = [
   {
+    id: "SAMPLE-FLOOD-001",
+    lat: -25.2950,
+    lng: -57.6250,
+    description: "Acumulación importante de agua sobre la calzada tras lluvias intensas. El agua cubre parcialmente las veredas y dificulta el tránsito vehicular.",
+    severity: "alto",
+    dateTime: new Date().toISOString(),
+    imageUrl: "https://images.unsplash.com/photo-1547683905-f686c993aae5?q=80&w=1000&auto=format&fit=crop",
+    status: "pendiente"
+  },
+  {
     id: "R001",
     lat: -25.2985,
     lng: -57.6250,
