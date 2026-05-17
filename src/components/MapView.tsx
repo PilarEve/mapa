@@ -65,7 +65,13 @@ export default function MapView() {
         if (newsError) {
           console.error('Error fetching news:', newsError);
         } else if (newsData) {
-          const validNews = newsData.filter(n => n.latitud != null && n.longitud != null) as NoticiaHistorica[];
+          const validNews = newsData
+            .filter(n => n.latitud != null && n.longitud != null)
+            .map(n => ({
+              ...n,
+              latitud: Number(n.latitud),
+              longitud: Number(n.longitud)
+            })) as NoticiaHistorica[];
           setNews(validNews);
         }
       } catch (err) {
