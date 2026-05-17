@@ -67,11 +67,16 @@ export default function MapView() {
         } else if (newsData) {
           const validNews = newsData
             .filter(n => n.latitud != null && n.longitud != null)
-            .map(n => ({
-              ...n,
-              latitud: Number(n.latitud),
-              longitud: Number(n.longitud)
-            })) as NoticiaHistorica[];
+            .map(n => {
+              const parsedLat = Number(n.latitud);
+              const parsedLng = Number(n.longitud);
+              console.log('Noticia Histórica:', n.titulo, '| Lat:', parsedLat, '| Lng:', parsedLng);
+              return {
+                ...n,
+                latitud: parsedLat,
+                longitud: parsedLng
+              };
+            }) as NoticiaHistorica[];
           setNews(validNews);
         }
       } catch (err) {
