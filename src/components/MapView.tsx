@@ -5,8 +5,9 @@ import { MapContainer, TileLayer } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { mockReports } from '../data/reports';
-import { Report, Severity } from '../types/report';
+import { Report, Severity, NoticiaHistorica } from '../types/report';
 import ReportMarker from './ReportMarker';
+import NewsMarker from './NewsMarker';
 import FilterPanel from './FilterPanel';
 import SidebarReports from './SidebarReports';
 import HeatmapLayer from './HeatmapLayer';
@@ -19,6 +20,7 @@ const ASUNCION_CENTER: [number, number] = [-25.2855, -57.6150];
 
 export default function MapView() {
   const [reports, setReports] = useState<Report[]>([]); // Inicializamos vacío
+  const [news, setNews] = useState<NoticiaHistorica[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSeverities, setSelectedSeverities] = useState<Severity[]>(['bajo', 'medio', 'alto', 'critico']);
   const [selectedStatus, setSelectedStatus] = useState<string>('todos');
@@ -53,6 +55,18 @@ export default function MapView() {
             status: (dbReport.estado || 'pendiente') as Report['status']
           }));
           setReports(mappedReports);
+        }
+
+        const { data: newsData, error: newsError } = await supabase
+          .from('noticias_historicas')
+          .select('*')
+          .order('fecha_publicacion', { ascending: false });
+
+        if (newsError) {
+          console.error('Error fetching news:', newsError);
+        } else if (newsData) {
+          const validNews = newsData.filter(n => n.latitud != null && n.longitud != null) as NoticiaHistorica[];
+          setNews(validNews);
         }
       } catch (err) {
         console.error('Unexpected error:', err);
@@ -200,6 +214,10 @@ export default function MapView() {
 
           {!isHeatmapVisible && filteredReports.map(report => (
             <ReportMarker key={report.id} report={report} />
+          ))}
+
+          {!isHeatmapVisible && news.map(noticia => (
+            <NewsMarker key={`news-${noticia.id}`} news={noticia} />
           ))}
 
           <HeatmapLayer 
