@@ -31,6 +31,11 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 relative overflow-hidden font-sans">
+      {/* Cartel de prueba de desarrollo */}
+      <div className="absolute top-0 left-0 w-full bg-amber-400 text-amber-950 text-center py-2 font-bold z-50 shadow-md text-sm">
+        Versión de desarrollo - Prueba de rama personal
+      </div>
+
       {/* Background Decorativo */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-blue-400/20 blur-[100px]"></div>
