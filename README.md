@@ -34,3 +34,26 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+
+# Proyecto
+
+## Sistema Integrado de Monitoreo y Visualización de Inundaciones Urbanas
+
+Plataforma web para monitoreo y visualización de inundaciones urbanas mediante:
+
+- Reportes ciudadanos
+- Geolocalización GPS
+- Imágenes
+- Heatmaps
+- Integración con Supabase
+- Noticias históricas
+
+Área de estudio:
+
+Área Metropolitana de Asunción, Paraguay.
+
+## Integrantes
+
+- Evelyn Paredes
+- Venus Ayala 
