@@ -7,6 +7,8 @@ export interface Report {
   dateTime: string;
   imageUrl?: string;
   status: 'pendiente' | 'validado' | 'rechazado';
+  /** 'imagen' para reportes nuevos. 'video' se mantiene solo por retrocompatibilidad con registros existentes. */
+  archivoTipo?: 'imagen' | 'video' | null;
 }
 
 export interface NoticiaHistorica {

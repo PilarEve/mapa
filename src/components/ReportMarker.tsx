@@ -4,7 +4,7 @@ import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Report } from '../types/report';
 import { format } from 'date-fns';
-import Image from 'next/image';
+
 
 const createCustomIcon = () => {
   const color = '#3b82f6'; // blue-500
@@ -40,16 +40,20 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
             <span className="text-[10px] uppercase font-extrabold tracking-widest text-gray-500">Reporte Ciudadano</span>
           </div>
 
-          {/* Image */}
+          {/* Media Evidence */}
           {report.imageUrl && (
-            <div className="w-full h-48 sm:h-[180px] relative rounded-xl overflow-hidden shadow-lg border border-gray-100">
-              <Image 
-                src={report.imageUrl} 
-                alt="Imagen enviada por ciudadano sobre evento reportado" 
-                fill
-                className="object-cover transition-transform duration-300 hover:scale-105"
-                unoptimized
-              />
+            <div className="w-full h-48 sm:h-[180px] relative rounded-xl overflow-hidden shadow-lg border border-gray-100 bg-black flex items-center justify-center">
+              {report.archivoTipo === 'video' ? (
+                <div className="w-full h-full flex items-center justify-center bg-slate-800 text-slate-400 text-xs font-medium px-4 text-center">
+                  Este tipo de evidencia ya no está disponible.
+                </div>
+              ) : (
+                <img 
+                  src={report.imageUrl} 
+                  alt="Evidencia enviada por ciudadano" 
+                  className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                />
+              )}
             </div>
           )}
           <div>

@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Report } from '../types/report';
-import { MapPin, Camera, X, Loader2, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, Camera, X, Loader2, AlertTriangle, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import Image from 'next/image';
+
 
 const AVAILABLE_TAGS = [
   'Calle inundada',
@@ -53,9 +53,18 @@ function MapUpdater({ lat, lng }: { lat: string; lng: string }) {
   return null;
 }
 
+const formatBytes = (bytes: number, decimals = 2) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
+
 interface ReportFormProps {
   onClose: () => void;
-  onSubmit: (report: Omit<Report, 'id' | 'status'>) => void;
+  onSubmit: (report: Report) => void;
 }
 
 export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
@@ -63,12 +72,20 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
   const [lng, setLng] = useState<string>('');
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const [impactTags, setImpactTags] = useState<string[]>([]);
-  const [imageUrl, setImageUrl] = useState<string>('');
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string>('');
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAfectacionesOpen, setIsAfectacionesOpen] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (filePreviewUrl) {
+        URL.revokeObjectURL(filePreviewUrl);
+      }
+    };
+  }, [filePreviewUrl]);
 
   const handleGetLocation = () => {
     setIsLocating(true);
@@ -92,36 +109,95 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
     }
   };
 
+  const validateFile = (file: File): { valid: boolean; error?: string } => {
+    const acceptedMimes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+    if (!acceptedMimes.includes(file.type)) {
+      return {
+        valid: false,
+        error: "Tipo de archivo no permitido. Solo se aceptan imágenes (JPG, JPEG, PNG, WebP)."
+      };
+    }
+
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      return {
+        valid: false,
+        error: "La imagen supera el tamaño máximo permitido (5 MB)."
+      };
+    }
+
+    return { valid: true };
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+
+      const validation = validateFile(file);
+      if (!validation.valid) {
+        alert(validation.error);
+        e.target.value = '';
+        return;
+      }
+
+      if (filePreviewUrl) {
+        URL.revokeObjectURL(filePreviewUrl);
+      }
+
+      setImageFile(file);
+      setFilePreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleRemoveFile = () => {
+    if (filePreviewUrl) {
+      URL.revokeObjectURL(filePreviewUrl);
+    }
+    setImageFile(null);
+    setFilePreviewUrl('');
+
+    const input1 = document.getElementById('file-upload') as HTMLInputElement;
+    if (input1) input1.value = '';
+    const input2 = document.getElementById('file-upload-replace') as HTMLInputElement;
+    if (input2) input2.value = '';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (!lat || !lng) {
       alert("Seleccioná una ubicación en el mapa antes de enviar el reporte.");
       return;
     }
-    const description = descriptionRef.current?.value || '';
-    
-    if (!imageUrl && !imageFile) {
-      alert("Subí una foto del reporte antes de enviar.");
-      return;
-    }
 
     setIsSubmitting(true);
-    let finalImageUrl = imageUrl;
+    let finalImageUrl = null;
+    let archivoTipo: 'imagen' | null = null;
 
     try {
-      // 1. Subir imagen a Supabase Storage si existe un archivo seleccionado
       if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${Math.random()}-${Date.now()}.${fileExt}`;
-        const filePath = `reportes/${fileName}`;
+        const fileExt = imageFile.name.split('.').pop() || '';
+        archivoTipo = 'imagen';
+
+        const fileName = `${crypto.randomUUID()}.${fileExt}`;
+        const filePath = `imagenes/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from('reportes')
-          .upload(filePath, imageFile);
+          .upload(filePath, imageFile, {
+            contentType: imageFile.type,
+            upsert: false
+          });
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          throw new Error(`Error al subir la imagen: ${uploadError.message}`);
+        }
 
-        // 2. Obtener la URL pública
         const { data: { publicUrl } } = supabase.storage
           .from('reportes')
           .getPublicUrl(filePath);
@@ -129,27 +205,50 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
         finalImageUrl = publicUrl;
       }
 
-      // 3. Enviar datos al componente padre
-      onSubmit({
-        lat: parseFloat(lat),
-        lng: parseFloat(lng),
-        description,
-        impactTags,
-        dateTime: new Date().toISOString(),
-        imageUrl: finalImageUrl || undefined
-      });
-    } catch (error) {
-      console.error('Error al subir la imagen:', error);
-      alert('Error al subir la imagen. El reporte se enviará sin imagen.');
-      
-      onSubmit({
-        lat: parseFloat(lat),
-        lng: parseFloat(lng),
-        description,
-        impactTags,
-        dateTime: new Date().toISOString(),
-        imageUrl: undefined
-      });
+      const { data, error: insertError } = await supabase
+        .from("reportes")
+        .insert({
+          descripcion: descriptionRef.current?.value || null,
+          latitud: parseFloat(lat),
+          longitud: parseFloat(lng),
+          imagen_url: finalImageUrl ?? null,
+          archivo_tipo: archivoTipo ?? null,
+          estado: "pendiente",
+          afectaciones: impactTags,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        throw new Error(`Error al guardar el reporte: ${insertError.message}`);
+      }
+
+      alert("¡Reporte enviado con éxito!");
+
+      const mappedNewReport: Report = {
+        id: data.id,
+        lat: Number(data.latitud),
+        lng: Number(data.longitud),
+        description: data.descripcion || 'Sin descripción',
+        impactTags: data.afectaciones || [],
+        dateTime: data.creado_en || new Date().toISOString(),
+        imageUrl: data.imagen_url || undefined,
+        status: (data.estado || 'pendiente') as Report['status'],
+        archivoTipo: data.archivo_tipo || null,
+      };
+
+      setLat('');
+      setLng('');
+      if (descriptionRef.current) descriptionRef.current.value = '';
+      setImpactTags([]);
+      setImageFile(null);
+      setFilePreviewUrl('');
+
+      onSubmit(mappedNewReport);
+    } catch (error: unknown) {
+      console.error('Error al enviar el reporte:', error);
+      const msg = error instanceof Error ? error.message : 'Ocurrió un error al enviar el reporte. Por favor, intentá nuevamente.';
+      alert(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -307,46 +406,82 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
           </div>
 
           <div className="space-y-3">
-            <label className="text-sm font-bold text-slate-600">Fotografía <span className="text-red-500">*</span></label>
-            <div className="relative border-2 border-dashed border-slate-300 rounded-2xl overflow-hidden bg-slate-50 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer group min-h-[150px] flex flex-col items-center justify-center">
-              {imageUrl ? (
-                <div className="w-full h-48 relative">
-                  <Image 
-                    src={imageUrl} 
-                    alt="Imagen enviada por ciudadano sobre evento reportado" 
-                    fill
-                    className="object-cover"
-                    unoptimized={imageUrl.startsWith('blob:')}
-                  />
-                  <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span className="text-white text-xs font-bold bg-slate-900/60 px-3 py-1.5 rounded-full backdrop-blur-sm">Cambiar Imagen</span>
-                  </div>
-                </div>
-              ) : (
+            <label className="text-sm font-bold text-slate-600">Evidencia fotográfica</label>
+            
+            {!filePreviewUrl ? (
+              <div className="relative border-2 border-dashed border-slate-300 rounded-2xl overflow-hidden bg-slate-50 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer group min-h-[150px] flex flex-col items-center justify-center">
                 <div className="p-6 flex flex-col items-center justify-center text-slate-500">
                   <div className="bg-white p-3 rounded-full shadow-sm mb-3 group-hover:scale-110 transition-transform">
                     <Camera size={24} className="text-slate-400 group-hover:text-blue-500" />
                   </div>
                   <span className="text-sm text-center font-medium">Haga clic para adjuntar evidencia gráfica o tomar foto</span>
                 </div>
-              )}
-              
-              <input 
-                type="file" 
-                id="file-upload"
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
-                accept="image/*"
-                capture="environment"
-                onChange={(e) => {
-                  if(e.target.files && e.target.files[0]) {
-                     const file = e.target.files[0];
-                     setImageFile(file);
-                     setImageUrl(URL.createObjectURL(file));
-                  }
-                }}
-              />
-            </div>
-            {imageUrl && <p className="text-xs text-green-600 mt-2 font-bold flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span> Imagen adjuntada correctamente.</p>}
+                
+                <input 
+                  type="file" 
+                  id="file-upload"
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleFileChange}
+                />
+              </div>
+            ) : (
+              <div className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 p-4 space-y-4">
+                <div className="w-full h-48 relative rounded-xl overflow-hidden bg-slate-900 border border-slate-200 flex items-center justify-center">
+                  <img 
+                    src={filePreviewUrl} 
+                    alt="Vista previa de la imagen" 
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+                
+                <div className="bg-white p-4 rounded-xl border border-slate-100 space-y-2 text-xs text-slate-600 shadow-sm">
+                  <div className="flex justify-between items-center gap-4">
+                    <span className="font-bold text-slate-500 uppercase tracking-wide text-[10px]">Nombre</span>
+                    <span className="text-slate-800 font-semibold truncate max-w-[220px]" title={imageFile?.name}>{imageFile?.name}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-500 uppercase tracking-wide text-[10px]">Tamaño</span>
+                    <span className="text-slate-800 font-semibold">{formatBytes(imageFile?.size ?? 0)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-500 uppercase tracking-wide text-[10px]">Tipo</span>
+                    <span className="text-slate-800 font-semibold capitalize flex items-center gap-1">
+                      <Camera size={14} className="text-blue-500" /> Imagen ({imageFile?.type.split('/').pop()})
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handleRemoveFile}
+                    className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors border border-red-100"
+                  >
+                    <Trash2 size={14} /> Eliminar
+                  </button>
+                  <label 
+                    htmlFor="file-upload-replace" 
+                    className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors border border-slate-200"
+                  >
+                    Reemplazar
+                  </label>
+                  <input 
+                    type="file" 
+                    id="file-upload-replace"
+                    className="hidden" 
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleFileChange}
+                  />
+                </div>
+              </div>
+            )}
+            {imageFile && (
+              <p className="text-xs text-green-600 mt-2 font-bold flex items-center gap-1.5 select-none">
+                <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span> 
+                Imagen adjuntada correctamente.
+              </p>
+            )}
           </div>
 
           <div className="pt-6 pb-2">

@@ -151,7 +151,8 @@ export default function MapView() {
             impactTags: dbReport.afectaciones || [],
             dateTime: dbReport.creado_en || new Date().toISOString(),
             imageUrl: dbReport.imagen_url || undefined,
-            status: (dbReport.estado || 'pendiente') as Report['status']
+            status: (dbReport.estado || 'pendiente') as Report['status'],
+            archivoTipo: dbReport.archivo_tipo || null
           }));
           setReports(mappedReports);
         }
@@ -264,76 +265,16 @@ export default function MapView() {
     });
   }, [news, showNews, selectedDateRange]);
 
-  const handleAddReport = async (newReportData: Omit<Report, 'id' | 'status'>) => {
-    try {
-      // Mapeamos del formato frontend al formato de la tabla en Supabase
-      // Omitimos 'estado' para que la base de datos use automáticamente su valor por defecto ('pendiente')
-      const newReportToInsert = {
-        latitud: newReportData.lat,
-        longitud: newReportData.lng,
-        descripcion: newReportData.description || null,
-        afectaciones: newReportData.impactTags ?? [],
-        imagen_url: newReportData.imageUrl || null
-      };
-
-      console.log('[ReporteForm] Insertando en Supabase:', newReportToInsert);
-
-      const { data, error } = await supabase
-        .from('reportes')
-        .insert([newReportToInsert])
-        .select()
-        .single();
-
-      if (error) {
-        console.error('[ReporteForm] Error de Supabase:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        throw error;
-      }
-
-      if (data) {
-        // Mapeamos el resultado de vuelta al formato frontend
-        const mappedNewReport: Report = {
-          id: data.id,
-          lat: Number(data.latitud),
-          lng: Number(data.longitud),
-          description: data.descripcion || 'Sin descripción',
-          impactTags: data.afectaciones || [],
-          dateTime: data.creado_en || new Date().toISOString(),
-          imageUrl: data.imagen_url || undefined,
-          status: (data.estado || 'pendiente') as Report['status']
-        };
-
-        setReports(prev => [mappedNewReport, ...prev]);
-        setShowReportForm(false);
-        if (mapRef) mapRef.setView([mappedNewReport.lat, mappedNewReport.lng], 15);
-      }
-    } catch (err: unknown) {
-      const error = err as { message?: string; code?: string; hint?: string };
-      console.error('[ReporteForm] Error completo al guardar reporte:', err);
-
-      // Mensajes de error específicos según el tipo de fallo
-      if (error?.code === '42703') {
-        alert('Error de estructura: una columna no existe en la base de datos. Revisá la consola del navegador para más detalles.');
-      } else if (error?.code === '23502') {
-        alert(`Error: falta un campo obligatorio en la base de datos. Detalle: ${error.hint || error.message}`);
-      } else if (error?.code === '42501') {
-        alert('Error de permisos: no tenés autorización para insertar reportes. Verificá las políticas RLS de Supabase.');
-      } else if (error?.message?.includes('storage')) {
-        alert('Error al subir la imagen. Verificá los permisos del bucket en Supabase Storage.');
-      } else {
-        alert(`Error al guardar el reporte: ${error?.message || 'Error desconocido'}. Revisá la consola del navegador para más detalles.`);
-      }
-    }
+  const handleAddReport = (newReport: Report) => {
+    setReports(prev => [newReport, ...prev]);
+    setShowReportForm(false);
+    if (mapRef) mapRef.setView([newReport.lat, newReport.lng], 15);
   };
 
   const handleSelectReportFromSidebar = (report: Report) => {
     if (mapRef) {
       mapRef.setView([report.lat, report.lng], 16);
-      if (window.innerWidth < 768) setIsSidebarOpen(false); // Cierra sidebar en móvil
+      if (window.innerWidth < 768) setIsSidebarOpen(false);
     }
   };
 
@@ -359,7 +300,7 @@ export default function MapView() {
   };
 
   return (
-    <div className="flex w-full h-screen bg-slate-50 overflow-hidden relative font-sans text-slate-800">
+    <div className="flex w-full h-full min-h-0 bg-slate-50 overflow-hidden relative font-sans text-slate-800">
       
       {/* Botones Flotantes Inferiores Derechos */}
       <div className="absolute bottom-24 right-4 md:bottom-8 md:right-8 z-[1000] flex flex-col gap-3 md:gap-4 items-end">
