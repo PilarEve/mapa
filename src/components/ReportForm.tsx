@@ -323,7 +323,8 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
                     className="w-full h-full"
                   >
                     <TileLayer
-                      url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     />
                     <LocationSelector setLocation={(l, lg) => { setLat(l); setLng(lg); }} />
                     <MapUpdater lat={lat} lng={lng} />
