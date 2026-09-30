@@ -98,21 +98,23 @@ export default function FilterPanel({
   ];
 
   return (
-    <div className={`absolute z-[1000] bg-white/95 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.12)] w-[calc(100vw-2rem)] md:w-80 border border-slate-200/50 transition-all duration-300 overflow-hidden ${isExpanded ? 'rounded-2xl' : 'rounded-full'} ${className}`}>
+    <div className={`absolute z-[1000] bg-white/95 backdrop-blur-md shadow-lg border border-slate-200/80 transition-all duration-300 overflow-hidden ${isExpanded ? 'rounded-2xl w-[calc(100vw-1.5rem)] md:w-80' : 'rounded-full w-auto'} ${className}`}>
       
       {/* Header / Toggle Button */}
       <button 
+        type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-4 focus:outline-none"
+        className="w-full flex items-center justify-between px-3.5 py-2 md:p-3.5 focus:outline-none cursor-pointer gap-3"
+        aria-label="Alternar panel de visualización"
       >
-        <div className="flex items-center gap-2.5 text-slate-800 font-bold">
-          <div className="bg-blue-100/80 p-1.5 rounded-lg text-blue-600">
-            <Layers size={18} />
+        <div className="flex items-center gap-2 text-slate-800 font-bold text-xs md:text-sm">
+          <div className="bg-blue-100/80 p-1 md:p-1.5 rounded-lg text-blue-600 shrink-0">
+            <Layers size={16} />
           </div>
-          <span>Visualización</span>
+          <span className="whitespace-nowrap">Visualización</span>
         </div>
-        <div className="text-slate-400 bg-slate-100 p-1 rounded-full">
-          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        <div className="text-slate-400 bg-slate-100 p-1 rounded-full shrink-0">
+          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </div>
       </button>
 

@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Report } from '../types/report';
-import { MapPin, Camera, X, Loader2, AlertTriangle, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { MapPin, Camera, X, Loader2, AlertTriangle, ChevronDown, ChevronUp, Trash2, Image as ImageIcon, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const AVAILABLE_TAGS = [
   'Calle inundada',
@@ -18,9 +20,6 @@ const AVAILABLE_TAGS = [
   'Servicio público afectado',
   'Sin daños visibles'
 ];
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 
 const defaultIcon = L.divIcon({
   className: 'custom-leaflet-icon bg-transparent border-0',
@@ -71,11 +70,17 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
   const [lat, setLat] = useState<string>('');
   const [lng, setLng] = useState<string>('');
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  
   const [impactTags, setImpactTags] = useState<string[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string>('');
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStage, setSubmitStage] = useState<'idle' | 'uploading' | 'saving' | 'success'>('idle');
+  const [formError, setFormError] = useState<string | null>(null);
   const [isAfectacionesOpen, setIsAfectacionesOpen] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
 
@@ -89,67 +94,71 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
 
   const handleGetLocation = () => {
     setIsLocating(true);
+    setFormError(null);
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setLat(position.coords.latitude.toString());
           setLng(position.coords.longitude.toString());
           setIsLocating(false);
-          setIsMapOpen(true); // Desplegar mapa para confirmación visual
+          setIsMapOpen(true);
         },
         (error) => {
           console.error("Error al obtener ubicación", error);
-          alert("No se pudo obtener la ubicación. Por favor, ingrese las coordenadas manualmente.");
+          setFormError("No se pudo obtener la ubicación automáticamente. Por favor, usá el mapa para ubicar manualmente.");
           setIsLocating(false);
-        }
+          setIsMapOpen(true);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     } else {
-      alert("Geolocalización no soportada por el navegador.");
+      setFormError("Geolocalización no soportada por este navegador. Por favor, usá el mapa.");
       setIsLocating(false);
+      setIsMapOpen(true);
     }
   };
 
   const validateFile = (file: File): { valid: boolean; error?: string } => {
-    const acceptedMimes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ];
-    if (!acceptedMimes.includes(file.type)) {
+    // Permitir fotos tomadas por cámaras de celulares (image/*, HEIC, JPG, WEBP, PNG, etc.)
+    const isImage = file.type ? file.type.startsWith('image/') : /\.(jpg|jpeg|png|webp|heic|heif)$/i.test(file.name);
+    
+    if (!isImage) {
       return {
         valid: false,
-        error: "Tipo de archivo no permitido. Solo se aceptan imágenes (JPG, JPEG, PNG, WebP)."
+        error: "Archivo no válido. Por favor, seleccioná una imagen (JPG, PNG, WebP o formato de foto del celular)."
       };
     }
 
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = 10 * 1024 * 1024; // 10MB máximo para fotos móviles de alta resolución
     if (file.size > maxSize) {
       return {
         valid: false,
-        error: "La imagen supera el tamaño máximo permitido (5 MB)."
+        error: "La imagen supera el tamaño máximo permitido (10 MB)."
       };
     }
 
     return { valid: true };
   };
 
+  const processSelectedFile = (file: File) => {
+    setFormError(null);
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      setFormError(validation.error || "Error en el archivo");
+      return;
+    }
+
+    if (filePreviewUrl) {
+      URL.revokeObjectURL(filePreviewUrl);
+    }
+
+    setImageFile(file);
+    setFilePreviewUrl(URL.createObjectURL(file));
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-
-      const validation = validateFile(file);
-      if (!validation.valid) {
-        alert(validation.error);
-        e.target.value = '';
-        return;
-      }
-
-      if (filePreviewUrl) {
-        URL.revokeObjectURL(filePreviewUrl);
-      }
-
-      setImageFile(file);
-      setFilePreviewUrl(URL.createObjectURL(file));
+      processSelectedFile(e.target.files[0]);
     }
   };
 
@@ -159,43 +168,45 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
     }
     setImageFile(null);
     setFilePreviewUrl('');
-
-    const input1 = document.getElementById('file-upload') as HTMLInputElement;
-    if (input1) input1.value = '';
-    const input2 = document.getElementById('file-upload-replace') as HTMLInputElement;
-    if (input2) input2.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
+    if (replaceInputRef.current) replaceInputRef.current.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmitting) return; // Prevenir doble submit
 
     if (!lat || !lng) {
-      alert("Seleccioná una ubicación en el mapa antes de enviar el reporte.");
+      setFormError("Debés marcar una ubicación en el mapa antes de enviar el reporte.");
+      setIsMapOpen(true);
       return;
     }
 
     setIsSubmitting(true);
-    let finalImageUrl = null;
+    setFormError(null);
+    setSubmitStage('uploading');
+
+    let finalImageUrl: string | null = null;
     let archivoTipo: 'imagen' | null = null;
 
     try {
       if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop() || '';
+        const fileExt = imageFile.name.split('.').pop() || 'jpg';
         archivoTipo = 'imagen';
 
-        const fileName = `${crypto.randomUUID()}.${fileExt}`;
+        const fileName = `${Date.now()}_${crypto.randomUUID()}.${fileExt}`;
         const filePath = `imagenes/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from('reportes')
           .upload(filePath, imageFile, {
-            contentType: imageFile.type,
+            contentType: imageFile.type || 'image/jpeg',
             upsert: false
           });
 
         if (uploadError) {
-          throw new Error(`Error al subir la imagen: ${uploadError.message}`);
+          throw new Error(`Fallo al subir la imagen: ${uploadError.message}`);
         }
 
         const { data: { publicUrl } } = supabase.storage
@@ -205,14 +216,16 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
         finalImageUrl = publicUrl;
       }
 
+      setSubmitStage('saving');
+
       const { data, error: insertError } = await supabase
         .from("reportes")
         .insert({
           descripcion: descriptionRef.current?.value || null,
           latitud: parseFloat(lat),
           longitud: parseFloat(lng),
-          imagen_url: finalImageUrl ?? null,
-          archivo_tipo: archivoTipo ?? null,
+          imagen_url: finalImageUrl,
+          archivo_tipo: archivoTipo,
           estado: "pendiente",
           afectaciones: impactTags,
         })
@@ -220,10 +233,10 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
         .single();
 
       if (insertError) {
-        throw new Error(`Error al guardar el reporte: ${insertError.message}`);
+        throw new Error(`Fallo al guardar el reporte: ${insertError.message}`);
       }
 
-      alert("¡Reporte enviado con éxito!");
+      setSubmitStage('success');
 
       const mappedNewReport: Report = {
         id: data.id,
@@ -237,84 +250,98 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
         archivoTipo: data.archivo_tipo || null,
       };
 
-      setLat('');
-      setLng('');
-      if (descriptionRef.current) descriptionRef.current.value = '';
-      setImpactTags([]);
-      setImageFile(null);
-      setFilePreviewUrl('');
+      setTimeout(() => {
+        onSubmit(mappedNewReport);
+      }, 500);
 
-      onSubmit(mappedNewReport);
     } catch (error: unknown) {
       console.error('Error al enviar el reporte:', error);
       const msg = error instanceof Error ? error.message : 'Ocurrió un error al enviar el reporte. Por favor, intentá nuevamente.';
-      alert(msg);
-    } finally {
+      setFormError(msg);
+      setSubmitStage('idle');
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[3000] bg-slate-900/60 backdrop-blur-sm flex items-end md:items-center justify-center md:p-4 transition-all">
-      <div className="bg-white md:rounded-3xl rounded-t-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-300">
+    <div className="fixed inset-0 z-[5000] bg-slate-900/60 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4 transition-all">
+      <div className="bg-white rounded-t-3xl md:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-300 flex flex-col max-h-[90dvh] md:max-h-[85vh]">
         
-        <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-6 flex justify-between items-center relative overflow-hidden">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-          <h2 className="text-xl font-bold relative z-10">Nuevo Reporte Ciudadano</h2>
+        {/* Modal Header */}
+        <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-5 flex justify-between items-center relative overflow-hidden shrink-0">
+          <div>
+            <h2 className="text-lg md:text-xl font-bold relative z-10">Nuevo Reporte Ciudadano</h2>
+            <p className="text-xs text-blue-100/90 relative z-10 mt-0.5">Reportá inundaciones o anegamientos en tiempo real</p>
+          </div>
           <button 
+            type="button"
             onClick={onClose} 
-            className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full backdrop-blur-sm transition-colors relative z-10"
+            disabled={isSubmitting}
+            className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full backdrop-blur-sm transition-colors relative z-10 disabled:opacity-50"
           >
             <X size={20} />
           </button>
         </div>
-        
-        <form onSubmit={handleSubmit} className="form-scrollable p-6 space-y-5 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200">
-          <div className="space-y-3 border border-slate-100 rounded-2xl p-4 bg-slate-50/30">
-            <div className="flex justify-between items-start select-none">
-              <div>
-                <label className="text-sm font-bold text-slate-700">Ubicación <span className="text-red-500">*</span></label>
-                {lat && lng && !isMapOpen && (
-                  <p className="text-xs text-green-600 font-semibold mt-0.5 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                    Ubicación seleccionada
-                  </p>
-                )}
-              </div>
-            </div>
-            
-            <p className="text-xs text-slate-500">
-              Confirmá la ubicación del problema. Podés obtenerla automáticamente o marcarla en el mapa.
-            </p>
 
-            <div className="flex flex-col gap-2 md:flex-row">
+        {/* Form Error Banner */}
+        {formError && (
+          <div className="bg-red-50 border-b border-red-200 px-5 py-3 flex items-start gap-2.5 shrink-0 text-red-700 text-xs font-semibold animate-in fade-in duration-200">
+            <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={16} />
+            <div className="flex-1">{formError}</div>
+            <button type="button" onClick={() => setFormError(null)} className="text-red-400 hover:text-red-700">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        
+        {/* Scrollable Form Body */}
+        <form onSubmit={handleSubmit} className="form-scrollable p-5 space-y-4 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-slate-200">
+          
+          {/* Ubicación */}
+          <div className="space-y-2.5 border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
+            <div className="flex justify-between items-center select-none">
+              <label className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                <MapPin size={16} className="text-blue-600" />
+                Ubicación del evento <span className="text-red-500">*</span>
+              </label>
+              {lat && lng && (
+                <span className="text-xs text-green-700 font-bold bg-green-50 border border-green-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                  Ubicado
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <button 
                 type="button" 
                 onClick={handleGetLocation}
-                disabled={isLocating}
-                className="flex-1 flex justify-center items-center gap-2 py-3 text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-blue-100 cursor-pointer"
+                disabled={isLocating || isSubmitting}
+                className="flex justify-center items-center gap-2 py-2.5 px-3 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 rounded-xl transition-colors disabled:opacity-50 border border-blue-100 cursor-pointer"
               >
-                <MapPin size={18} /> 
-                {isLocating ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual'}
+                {isLocating ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
+                <span>{isLocating ? 'Obteniendo GPS...' : 'Mi ubicación actual'}</span>
               </button>
 
               <button 
                 type="button"
                 onClick={() => setIsMapOpen(!isMapOpen)}
-                className={`flex-1 flex justify-center items-center gap-2 py-3 text-sm font-bold border rounded-xl transition-all cursor-pointer ${
+                disabled={isSubmitting}
+                className={`flex justify-center items-center gap-2 py-2.5 px-3 text-xs font-bold border rounded-xl transition-all cursor-pointer ${
                   isMapOpen 
-                    ? 'bg-slate-100 border-slate-300 text-slate-700' 
-                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+                    ? 'bg-slate-200 border-slate-300 text-slate-800' 
+                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                <span>Ubicar manualmente</span>
+                <span>Ubicar en el mapa</span>
                 {isMapOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               </button>
             </div>
 
-            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isMapOpen ? 'max-h-[350px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
-              <p className="text-xs text-slate-500 mb-2 pt-2">Marcá la ubicación exacta del evento tocando o haciendo clic en el mapa.</p>
-              <div className="w-full h-56 rounded-xl overflow-hidden border border-slate-200 relative z-0">
+            {/* Sub-mapa para seleccionar ubicación exacta */}
+            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isMapOpen ? 'max-h-[300px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
+              <p className="text-[11px] text-slate-500 mb-2">Tocá o hacé clic en el mapa para marcar el lugar exacto:</p>
+              <div className="w-full h-48 rounded-xl overflow-hidden border border-slate-200 relative z-0">
                 {useMemo(() => (
                   <MapContainer 
                     center={[-25.2855, -57.6150]} 
@@ -324,7 +351,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
                   >
                     <TileLayer
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      attribution='&copy; OpenStreetMap'
                     />
                     <LocationSelector setLocation={(l, lg) => { setLat(l); setLng(lg); }} />
                     <MapUpdater lat={lat} lng={lng} />
@@ -337,18 +364,123 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
             </div>
           </div>
 
-          <div className="space-y-3 border border-slate-100 rounded-2xl p-4 bg-slate-50/30">
+          {/* Evidencia fotográfica desde móvil/escritorio */}
+          <div className="space-y-2.5 border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
+            <label className="text-sm font-bold text-slate-800 flex items-center justify-between">
+              <span>Evidencia fotográfica</span>
+              <span className="text-[11px] font-normal text-slate-500">Opcional</span>
+            </label>
+
+            {!filePreviewUrl ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Botón 1: Cámara celular */}
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    disabled={isSubmitting}
+                    className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-blue-200 hover:border-blue-400 bg-white hover:bg-blue-50/50 rounded-xl transition-all group cursor-pointer text-center"
+                  >
+                    <div className="p-2 rounded-full bg-blue-50 text-blue-600 group-hover:scale-110 transition-transform mb-1.5">
+                      <Camera size={20} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-700">Tomar foto</span>
+                    <span className="text-[10px] text-slate-400">Usar la cámara</span>
+                  </button>
+
+                  {/* Botón 2: Galería */}
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    disabled={isSubmitting}
+                    className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-slate-200 hover:border-blue-400 bg-white hover:bg-blue-50/50 rounded-xl transition-all group cursor-pointer text-center"
+                  >
+                    <div className="p-2 rounded-full bg-slate-100 text-slate-600 group-hover:scale-110 transition-transform mb-1.5">
+                      <ImageIcon size={20} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-700">Galería</span>
+                    <span className="text-[10px] text-slate-400">Elegir archivo</span>
+                  </button>
+                </div>
+
+                {/* Inputs ocultos */}
+                <input 
+                  ref={cameraInputRef}
+                  type="file" 
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden" 
+                  onChange={handleFileChange}
+                />
+                <input 
+                  ref={galleryInputRef}
+                  type="file" 
+                  accept="image/*"
+                  className="hidden" 
+                  onChange={handleFileChange}
+                />
+              </div>
+            ) : (
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white p-3 space-y-3 shadow-sm">
+                <div className="w-full h-44 relative rounded-lg overflow-hidden bg-slate-900 flex items-center justify-center">
+                  <img 
+                    src={filePreviewUrl} 
+                    alt="Vista previa de foto" 
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                  <div className="truncate max-w-[180px] font-semibold text-slate-800">
+                    {imageFile?.name || 'Fotografía seleccionada'}
+                  </div>
+                  <div className="text-[11px] font-bold text-slate-500">
+                    {formatBytes(imageFile?.size ?? 0)}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={handleRemoveFile}
+                    disabled={isSubmitting}
+                    className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-red-100 cursor-pointer disabled:opacity-50"
+                  >
+                    <Trash2 size={14} /> Eliminar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => replaceInputRef.current?.click()}
+                    disabled={isSubmitting}
+                    className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-slate-200 cursor-pointer disabled:opacity-50"
+                  >
+                    Cambiar
+                  </button>
+                  <input 
+                    ref={replaceInputRef}
+                    type="file" 
+                    accept="image/*"
+                    className="hidden" 
+                    onChange={handleFileChange}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Afectaciones (Acordeón) */}
+          <div className="space-y-2 border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
             <div 
               onClick={() => setIsAfectacionesOpen(!isAfectacionesOpen)}
               className="flex items-center justify-between cursor-pointer select-none group"
             >
               <div>
-                <label className="text-sm font-bold text-slate-700 cursor-pointer group-hover:text-blue-600 transition-colors">
+                <label className="text-sm font-bold text-slate-800 cursor-pointer group-hover:text-blue-600 transition-colors">
                   ¿Qué afectaciones se observan?
                 </label>
-                {!isAfectacionesOpen && impactTags.length > 0 && (
+                {impactTags.length > 0 && !isAfectacionesOpen && (
                   <p className="text-xs text-blue-600 font-semibold mt-0.5">
-                    {impactTags.length} {impactTags.length === 1 ? 'afectación seleccionada' : 'afectaciones seleccionadas'}
+                    {impactTags.length} seleccionada(s)
                   </p>
                 )}
               </div>
@@ -357,15 +489,15 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
               </div>
             </div>
 
-            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isAfectacionesOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
-              <p className="text-xs text-slate-500 mb-3 pt-2">Opcional. Podés seleccionar una o varias opciones.</p>
-              <div className="flex flex-wrap gap-2">
+            <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isAfectacionesOpen ? 'max-h-[300px] opacity-100 pt-2' : 'max-h-0 opacity-0'}`}>
+              <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto scrollbar-thin">
                 {AVAILABLE_TAGS.map((tag) => {
                   const isSelected = impactTags.includes(tag);
                   return (
                     <button
                       key={tag}
                       type="button"
+                      disabled={isSubmitting}
                       onClick={() => {
                         if (isSelected) {
                           setImpactTags(prev => prev.filter(t => t !== tag));
@@ -373,10 +505,10 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
                           setImpactTags(prev => [...prev, tag]);
                         }
                       }}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors border cursor-pointer ${
+                      className={`px-2.5 py-1.5 rounded-full text-xs font-semibold transition-colors border cursor-pointer ${
                         isSelected 
-                          ? 'bg-blue-100 border-blue-500 text-blue-800' 
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          ? 'bg-blue-600 border-blue-600 text-white' 
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
                       }`}
                     >
                       {tag}
@@ -385,122 +517,47 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
                 })}
               </div>
             </div>
-
-            {(impactTags.includes('Persona atrapada') || impactTags.includes('Fallecimiento reportado')) && (
-              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-                <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={18} />
-                <p className="text-sm text-red-700 font-medium">
-                  Si hay personas en riesgo o una emergencia activa, contactá inmediatamente a los servicios de emergencia correspondientes.
-                </p>
-              </div>
-            )}
           </div>
 
-          <div className="space-y-3">
-            <label className="text-sm font-bold text-slate-600">Descripción del evento</label>
-            <p className="text-xs text-slate-500">Opcional. Podés agregar más detalles sobre la situación.</p>
+          {/* Descripción */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700">Descripción del evento</label>
             <textarea 
               ref={descriptionRef}
-              placeholder="Describa la situación de la inundación (ej: agua sobre la vereda, arroyo desbordado)..."
-              className="w-full text-sm p-4 bg-slate-50 border border-slate-200 rounded-xl h-28 resize-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white outline-none transition-all font-medium"
+              disabled={isSubmitting}
+              placeholder="Escribí aquí detalles sobre el nivel del agua, tránsito o daños..."
+              className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl h-24 resize-none focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all disabled:opacity-50"
             />
           </div>
 
-          <div className="space-y-3">
-            <label className="text-sm font-bold text-slate-600">Evidencia fotográfica</label>
-            
-            {!filePreviewUrl ? (
-              <div className="relative border-2 border-dashed border-slate-300 rounded-2xl overflow-hidden bg-slate-50 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer group min-h-[150px] flex flex-col items-center justify-center">
-                <div className="p-6 flex flex-col items-center justify-center text-slate-500">
-                  <div className="bg-white p-3 rounded-full shadow-sm mb-3 group-hover:scale-110 transition-transform">
-                    <Camera size={24} className="text-slate-400 group-hover:text-blue-500" />
-                  </div>
-                  <span className="text-sm text-center font-medium">Haga clic para adjuntar evidencia gráfica o tomar foto</span>
-                </div>
-                
-                <input 
-                  type="file" 
-                  id="file-upload"
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleFileChange}
-                />
-              </div>
-            ) : (
-              <div className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 p-4 space-y-4">
-                <div className="w-full h-48 relative rounded-xl overflow-hidden bg-slate-900 border border-slate-200 flex items-center justify-center">
-                  <img 
-                    src={filePreviewUrl} 
-                    alt="Vista previa de la imagen" 
-                    className="max-h-full max-w-full object-contain"
-                  />
-                </div>
-                
-                <div className="bg-white p-4 rounded-xl border border-slate-100 space-y-2 text-xs text-slate-600 shadow-sm">
-                  <div className="flex justify-between items-center gap-4">
-                    <span className="font-bold text-slate-500 uppercase tracking-wide text-[10px]">Nombre</span>
-                    <span className="text-slate-800 font-semibold truncate max-w-[220px]" title={imageFile?.name}>{imageFile?.name}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-500 uppercase tracking-wide text-[10px]">Tamaño</span>
-                    <span className="text-slate-800 font-semibold">{formatBytes(imageFile?.size ?? 0)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-500 uppercase tracking-wide text-[10px]">Tipo</span>
-                    <span className="text-slate-800 font-semibold capitalize flex items-center gap-1">
-                      <Camera size={14} className="text-blue-500" /> Imagen ({imageFile?.type.split('/').pop()})
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 justify-end pt-1">
-                  <button
-                    type="button"
-                    onClick={handleRemoveFile}
-                    className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors border border-red-100"
-                  >
-                    <Trash2 size={14} /> Eliminar
-                  </button>
-                  <label 
-                    htmlFor="file-upload-replace" 
-                    className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors border border-slate-200"
-                  >
-                    Reemplazar
-                  </label>
-                  <input 
-                    type="file" 
-                    id="file-upload-replace"
-                    className="hidden" 
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handleFileChange}
-                  />
-                </div>
-              </div>
-            )}
-            {imageFile && (
-              <p className="text-xs text-green-600 mt-2 font-bold flex items-center gap-1.5 select-none">
-                <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span> 
-                Imagen adjuntada correctamente.
-              </p>
-            )}
-          </div>
-
-          <div className="pt-6 pb-2">
+          {/* Botón de envío con estado claro */}
+          <div className="pt-2 pb-1 shrink-0">
             <button 
               type="submit"
               disabled={isSubmitting}
-              className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-4 px-6 rounded-xl shadow-[0_8px_20px_rgb(37,99,235,0.3)] hover:shadow-[0_8px_25px_rgb(37,99,235,0.4)] transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="animate-spin" size={20} />
-                  Enviando reporte...
+                  <Loader2 className="animate-spin" size={18} />
+                  <span>
+                    {submitStage === 'uploading' && 'Subiendo fotografía...'}
+                    {submitStage === 'saving' && 'Guardando reporte...'}
+                    {submitStage === 'success' && '¡Reporte creado!'}
+                  </span>
                 </>
-              ) : 'Confirmar y Enviar Reporte'}
+              ) : (
+                <>
+                  <CheckCircle2 size={18} />
+                  <span>Confirmar y Enviar Reporte</span>
+                </>
+              )}
             </button>
           </div>
+
         </form>
       </div>
     </div>
   );
 }
+
