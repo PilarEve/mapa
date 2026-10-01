@@ -12,7 +12,7 @@ import FilterPanel from './FilterPanel';
 import SidebarReports from './SidebarReports';
 import HeatmapLayer from './HeatmapLayer';
 import ReportForm from './ReportForm';
-import { Plus, ListFilter, X, Loader2, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Plus, ListFilter, X, Loader2, ChevronRight, AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import SearchBar from './SearchBar';
 import CustomZoomControl from './CustomZoomControl';
@@ -288,15 +288,11 @@ export default function MapView() {
   };
 
   const handleZoomIn = () => {
-    if (mapRef) {
-      mapRef.zoomIn();
-    }
+    if (mapRef) mapRef.zoomIn();
   };
 
   const handleZoomOut = () => {
-    if (mapRef) {
-      mapRef.zoomOut();
-    }
+    if (mapRef) mapRef.zoomOut();
   };
 
   return (
@@ -310,6 +306,7 @@ export default function MapView() {
 
         {/* Botón Ver Reportes (Solo Móvil) */}
         <button 
+          type="button"
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
           className={`md:hidden bg-white text-slate-700 font-bold py-3.5 px-5 rounded-full shadow-[0_8px_20px_rgb(0,0,0,0.15)] flex items-center gap-2 transition-all transform active:scale-95 border border-slate-200 ${isSidebarOpen ? 'bg-slate-100' : ''}`}
         >
@@ -319,8 +316,9 @@ export default function MapView() {
 
         {/* Botón Flotante para Nuevo Reporte */}
         <button 
+          type="button"
           onClick={() => setShowReportForm(true)}
-          className="bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-bold py-3.5 px-6 md:py-4 md:px-8 rounded-full shadow-2xl shadow-blue-500/30 flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 border border-blue-400/20"
+          className="bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-bold py-3.5 px-6 md:py-4 md:px-8 rounded-full shadow-2xl shadow-blue-500/30 flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 border border-blue-400/20 cursor-pointer"
         >
           <Plus size={22} className="drop-shadow-md" />
           <span className="text-sm md:text-base drop-shadow-md">Nuevo Reporte</span>
@@ -356,6 +354,7 @@ export default function MapView() {
       <div className="flex-1 min-w-0 relative h-full overflow-hidden">
         {/* Botón flotante para abrir el sidebar */}
         <button
+          type="button"
           onClick={() => setIsSidebarOpen(true)}
           className={`absolute z-[1000] bg-white/95 backdrop-blur-md text-slate-800 font-bold py-3 px-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex items-center justify-between md:justify-start gap-2 border border-slate-200/50 cursor-pointer transition-all duration-300
             ${isSidebarOpen 
@@ -458,3 +457,4 @@ export default function MapView() {
     </div>
   );
 }
+
