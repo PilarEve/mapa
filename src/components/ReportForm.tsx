@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Report } from '../types/report';
-import { MapPin, Camera, X, Loader2, AlertTriangle, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { MapPin, Camera, Image as ImageIcon, X, Loader2, AlertTriangle, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 
@@ -71,6 +71,8 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
   const [lat, setLat] = useState<string>('');
   const [lng, setLng] = useState<string>('');
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const [impactTags, setImpactTags] = useState<string[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string>('');
@@ -78,6 +80,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAfectacionesOpen, setIsAfectacionesOpen] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
+  const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -110,23 +113,18 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
   };
 
   const validateFile = (file: File): { valid: boolean; error?: string } => {
-    const acceptedMimes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ];
-    if (!acceptedMimes.includes(file.type)) {
+    if (!file.type.startsWith('image/')) {
       return {
         valid: false,
-        error: "Tipo de archivo no permitido. Solo se aceptan imágenes (JPG, JPEG, PNG, WebP)."
+        error: "Tipo de archivo no permitido. Solo se aceptan imágenes."
       };
     }
 
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
       return {
         valid: false,
-        error: "La imagen supera el tamaño máximo permitido (5 MB)."
+        error: "La imagen supera el tamaño máximo permitido (10 MB)."
       };
     }
 
@@ -150,6 +148,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
 
       setImageFile(file);
       setFilePreviewUrl(URL.createObjectURL(file));
+      setIsImagePickerOpen(false);
     }
   };
 
@@ -160,10 +159,8 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
     setImageFile(null);
     setFilePreviewUrl('');
 
-    const input1 = document.getElementById('file-upload') as HTMLInputElement;
-    if (input1) input1.value = '';
-    const input2 = document.getElementById('file-upload-replace') as HTMLInputElement;
-    if (input2) input2.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+    if (galleryInputRef.current) galleryInputRef.current.value = '';
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -323,7 +320,8 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
                     className="w-full h-full"
                   >
                     <TileLayer
-                      url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     />
                     <LocationSelector setLocation={(l, lg) => { setLat(l); setLng(lg); }} />
                     <MapUpdater lat={lat} lng={lng} />
@@ -405,25 +403,21 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
             />
           </div>
 
+          {/* Evidencia fotográfica */}
           <div className="space-y-3">
             <label className="text-sm font-bold text-slate-600">Evidencia fotográfica</label>
             
             {!filePreviewUrl ? (
-              <div className="relative border-2 border-dashed border-slate-300 rounded-2xl overflow-hidden bg-slate-50 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer group min-h-[150px] flex flex-col items-center justify-center">
+              <div 
+                onClick={() => setIsImagePickerOpen(true)}
+                className="relative border-2 border-dashed border-slate-300 rounded-2xl overflow-hidden bg-slate-50 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer group min-h-[150px] flex flex-col items-center justify-center"
+              >
                 <div className="p-6 flex flex-col items-center justify-center text-slate-500">
                   <div className="bg-white p-3 rounded-full shadow-sm mb-3 group-hover:scale-110 transition-transform">
                     <Camera size={24} className="text-slate-400 group-hover:text-blue-500" />
                   </div>
                   <span className="text-sm text-center font-medium">Haga clic para adjuntar evidencia gráfica o tomar foto</span>
                 </div>
-                
-                <input 
-                  type="file" 
-                  id="file-upload"
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleFileChange}
-                />
               </div>
             ) : (
               <div className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 p-4 space-y-4">
@@ -460,19 +454,13 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
                   >
                     <Trash2 size={14} /> Eliminar
                   </button>
-                  <label 
-                    htmlFor="file-upload-replace" 
+                  <button
+                    type="button"
+                    onClick={() => setIsImagePickerOpen(true)}
                     className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition-colors border border-slate-200"
                   >
                     Reemplazar
-                  </label>
-                  <input 
-                    type="file" 
-                    id="file-upload-replace"
-                    className="hidden" 
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handleFileChange}
-                  />
+                  </button>
                 </div>
               </div>
             )}
@@ -499,6 +487,73 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
             </button>
           </div>
         </form>
+
+        {/* Inputs de archivos ocultos */}
+        <input 
+          ref={cameraInputRef}
+          type="file" 
+          accept="image/*"
+          capture="environment"
+          className="hidden" 
+          onChange={handleFileChange}
+        />
+        <input 
+          ref={galleryInputRef}
+          type="file" 
+          accept="image/*"
+          className="hidden" 
+          onChange={handleFileChange}
+        />
+
+        {/* Modal / Bottom Sheet para seleccionar origen de fotografía */}
+        {isImagePickerOpen && (
+          <div 
+            className="fixed inset-0 z-[3500] bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-4"
+            onClick={() => setIsImagePickerOpen(false)}
+          >
+            <div 
+              className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl animate-in slide-in-from-bottom-5 sm:zoom-in-95"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-base font-bold text-slate-800">Seleccionar fotografía</h3>
+                <button 
+                  type="button"
+                  onClick={() => setIsImagePickerOpen(false)}
+                  className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center p-4 border border-slate-200 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 rounded-xl transition-all group cursor-pointer text-center"
+                >
+                  <div className="p-3 rounded-full bg-blue-100 text-blue-600 group-hover:scale-110 transition-transform mb-2">
+                    <Camera size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-800">Tomar foto</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5">Abrir cámara</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center p-4 border border-slate-200 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 rounded-xl transition-all group cursor-pointer text-center"
+                >
+                  <div className="p-3 rounded-full bg-slate-100 text-slate-600 group-hover:scale-110 transition-transform mb-2">
+                    <ImageIcon size={22} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-800">Elegir de galería</span>
+                  <span className="text-[10px] text-slate-500 mt-0.5">Archivos del celular</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
