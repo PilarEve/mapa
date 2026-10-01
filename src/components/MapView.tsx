@@ -265,8 +265,6 @@ export default function MapView() {
     });
   }, [news, showNews, selectedDateRange]);
 
-  const [isMobileReportsOpen, setIsMobileReportsOpen] = useState(false);
-
   const handleAddReport = (newReport: Report) => {
     setReports(prev => [newReport, ...prev]);
     setShowReportForm(false);
@@ -276,10 +274,7 @@ export default function MapView() {
   const handleSelectReportFromSidebar = (report: Report) => {
     if (mapRef) {
       mapRef.setView([report.lat, report.lng], 16);
-      if (window.innerWidth < 768) {
-        setIsSidebarOpen(false);
-        setIsMobileReportsOpen(false);
-      }
+      if (window.innerWidth < 768) setIsSidebarOpen(false);
     }
   };
 
@@ -304,30 +299,48 @@ export default function MapView() {
     <div className="flex w-full h-full min-h-0 bg-slate-50 overflow-hidden relative font-sans text-slate-800">
       
       {/* Botones Flotantes Inferiores Derechos */}
-      <div className="absolute bottom-6 right-3 md:bottom-8 md:right-8 z-[1000] flex flex-col gap-3 md:gap-4 items-end pointer-events-none">
-        <div className="pointer-events-auto flex flex-col gap-3 items-end">
-          {/* Control de Zoom Personalizado */}
-          <CustomZoomControl onZoomIn={handleZoomIn} onZoomOut={handleZoomOut} />
+      <div className="absolute bottom-24 right-4 md:bottom-8 md:right-8 z-[1000] flex flex-col gap-3 md:gap-4 items-end">
+        
+        {/* Control de Zoom Personalizado */}
+        <CustomZoomControl onZoomIn={handleZoomIn} onZoomOut={handleZoomOut} />
 
-          {/* Botón Flotante para Nuevo Reporte */}
-          <button 
-            type="button"
-            onClick={() => setShowReportForm(true)}
-            className="bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-bold py-3 px-5 md:py-4 md:px-8 rounded-full shadow-2xl shadow-blue-500/30 flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 border border-blue-400/20 cursor-pointer"
-          >
-            <Plus size={20} className="drop-shadow-md" />
-            <span className="text-xs md:text-base drop-shadow-md">Nuevo Reporte</span>
-          </button>
-        </div>
+        {/* Botón Ver Reportes (Solo Móvil) */}
+        <button 
+          type="button"
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className={`md:hidden bg-white text-slate-700 font-bold py-3.5 px-5 rounded-full shadow-[0_8px_20px_rgb(0,0,0,0.15)] flex items-center gap-2 transition-all transform active:scale-95 border border-slate-200 ${isSidebarOpen ? 'bg-slate-100' : ''}`}
+        >
+          {isSidebarOpen ? <X size={20} /> : <ListFilter size={20} />}
+          <span className="text-sm">{isSidebarOpen ? 'Cerrar Lista' : 'Ver Reportes'}</span>
+        </button>
+
+        {/* Botón Flotante para Nuevo Reporte */}
+        <button 
+          type="button"
+          onClick={() => setShowReportForm(true)}
+          className="bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-bold py-3.5 px-6 md:py-4 md:px-8 rounded-full shadow-2xl shadow-blue-500/30 flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 border border-blue-400/20 cursor-pointer"
+        >
+          <Plus size={22} className="drop-shadow-md" />
+          <span className="text-sm md:text-base drop-shadow-md">Nuevo Reporte</span>
+        </button>
+
       </div>
 
-      {/* Sidebar de Lista de Reportes (Solo Escritorio / Pantallas Medias) */}
+      {/* Overlay Oscuro para móvil cuando el sidebar está abierto */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[1500] md:hidden transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar de Lista de Reportes */}
       <div className={`
-        hidden md:block relative top-0 left-0 h-full z-[2000] md:z-10
+        fixed md:relative top-0 left-0 h-full z-[2000] md:z-10
         transform transition-all duration-300 ease-in-out
         ${isSidebarOpen 
-          ? 'w-80 md:w-96 opacity-100' 
-          : 'w-0 opacity-0 overflow-hidden pointer-events-none'
+          ? 'translate-x-0 w-80 md:w-96 opacity-100' 
+          : '-translate-x-full md:translate-x-0 md:w-0 md:opacity-0 md:overflow-hidden pointer-events-none'
         }
       `}>
         <SidebarReports 
@@ -339,151 +352,65 @@ export default function MapView() {
 
       {/* Contenedor Principal del Mapa */}
       <div className="flex-1 min-w-0 relative h-full overflow-hidden">
-
-        {/* ---------------- BARRA SUPERIOR PARA MÓVIL (Acordeones 1-línea) ---------------- */}
-        <div className="md:hidden absolute top-3 left-3 right-3 z-[1000] flex flex-col gap-2 pointer-events-none">
-          
-          <div className="flex items-center justify-between gap-2 w-full">
-            
-            {/* Acordeón 1: Reportes Recientes (1 línea cerrado) */}
-            <div className="pointer-events-auto relative">
-              <button 
-                type="button"
-                onClick={() => {
-                  setIsMobileReportsOpen(!isMobileReportsOpen);
-                }}
-                className={`bg-white/95 backdrop-blur-md text-slate-800 font-bold py-2 px-3 rounded-full shadow-lg border border-slate-200/80 flex items-center gap-1.5 text-xs transition-all active:scale-95 cursor-pointer ${
-                  isMobileReportsOpen ? 'ring-2 ring-blue-500/30 bg-blue-50' : ''
-                }`}
-              >
-                <AlertTriangle className="text-blue-600 shrink-0" size={15} />
-                <span>Reportes ({filteredReports.length})</span>
-                {isMobileReportsOpen ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-400" />}
-              </button>
-            </div>
-
-            {/* Acordeón 2: Visualización (FilterPanel compacto) */}
-            <div className="pointer-events-auto relative">
-              <FilterPanel 
-                showReports={showReports}
-                onShowReportsChange={setShowReports}
-                showNews={showNews}
-                onShowNewsChange={setShowNews}
-                selectedStatuses={selectedStatuses}
-                onStatusesChange={setSelectedStatuses}
-                selectedDateRange={selectedDateRange}
-                onDateRangeChange={setSelectedDateRange}
-                selectedTags={selectedTags}
-                onTagsChange={setSelectedTags}
-                isHeatmapVisible={isHeatmapVisible}
-                onToggleHeatmap={setIsHeatmapVisible}
-                activeBaseMap={activeBaseMap}
-                onChangeBaseMap={setActiveBaseMap}
-                className="relative top-0 right-0"
-              />
-            </div>
-          </div>
-
-          {/* Desplegable Acordeón de Reportes Recientes en Móvil */}
-          {isMobileReportsOpen && (
-            <div className="pointer-events-auto bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-200 p-3 max-h-[50vh] overflow-y-auto w-full space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <span className="text-xs font-bold text-slate-800">Reportes Recientes ({filteredReports.length})</span>
-                <button 
-                  type="button" 
-                  onClick={() => setIsMobileReportsOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 p-1"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              {filteredReports.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-4">No hay reportes con los filtros seleccionados.</p>
-              ) : (
-                filteredReports.map((report) => (
-                  <div 
-                    key={report.id}
-                    onClick={() => handleSelectReportFromSidebar(report)}
-                    className="p-3 bg-white hover:bg-blue-50/50 rounded-xl border border-slate-100 shadow-sm cursor-pointer transition-colors space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between text-[11px]">
-                      <div className="flex flex-wrap gap-1">
-                        {report.impactTags?.slice(0, 2).map(tag => (
-                          <span key={tag} className="bg-blue-50 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                      <span className="text-slate-400 capitalize">{report.status}</span>
-                    </div>
-                    <p className="text-xs text-slate-700 font-medium line-clamp-2">{report.description}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {/* SearchBar en Móvil justo debajo de los acordeones */}
-          <div className="pointer-events-auto w-full">
-            <SearchBar 
-              onSelectLocation={handleSelectLocation}
-              className="w-full relative top-0 left-0 right-0"
-            />
-          </div>
-
-        </div>
-
-        {/* ---------------- BARRA Y CONTROLES PARA ESCRITORIO (md:) ---------------- */}
-        
-        {/* Botón para reabrir Sidebar en Escritorio */}
+        {/* Botón flotante para abrir el sidebar */}
         <button
           type="button"
           onClick={() => setIsSidebarOpen(true)}
-          className={`hidden md:flex absolute z-[1000] bg-white/95 backdrop-blur-md text-slate-800 font-bold py-3 px-4 rounded-2xl shadow-lg flex-items-center gap-2 border border-slate-200/50 cursor-pointer transition-all duration-300 top-4 left-4 ${
-            isSidebarOpen 
-              ? 'opacity-0 pointer-events-none -translate-x-4 scale-95' 
-              : 'opacity-100 pointer-events-auto translate-x-0 scale-100'
-          }`}
+          className={`absolute z-[1000] bg-white/95 backdrop-blur-md text-slate-800 font-bold py-3 px-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex items-center justify-between md:justify-start gap-2 border border-slate-200/50 cursor-pointer transition-all duration-300
+            ${isSidebarOpen 
+              ? 'opacity-0 pointer-events-none -translate-y-4 md:-translate-x-4 md:translate-y-0 scale-95' 
+              : 'opacity-100 pointer-events-auto translate-y-0 translate-x-0 scale-100'
+            }
+            top-4 left-4 right-4 md:right-auto md:w-auto
+          `}
           title="Mostrar reportes recientes"
         >
-          <AlertTriangle className="text-blue-600 animate-pulse shrink-0" size={18} />
-          <span className="text-sm font-semibold">Reportes Recientes ({filteredReports.length})</span>
-          <ChevronRight size={18} className="text-slate-400" />
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="text-blue-600 animate-pulse shrink-0" size={18} />
+            <span className="text-sm font-semibold truncate">Reportes Recientes</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-100 shrink-0">
+              {filteredReports.length}
+            </span>
+            <ChevronRight size={18} className="text-slate-400 hidden md:inline" />
+          </div>
         </button>
 
-        {/* SearchBar en Escritorio */}
-        <div className="hidden md:block">
-          <SearchBar 
-            onSelectLocation={handleSelectLocation}
-            className={`absolute md:w-80 lg:w-96 z-[1000] transition-all duration-300 top-4 ${
-              isSidebarOpen ? 'md:left-4' : 'md:left-[290px]'
-            }`}
-          />
-        </div>
+        {/* Barra de Búsqueda de Ubicación */}
+        <SearchBar 
+          onSelectLocation={handleSelectLocation}
+          className={`absolute left-4 right-4 md:right-auto md:w-80 lg:w-96 z-[1000] transition-all duration-300
+            ${isSidebarOpen 
+              ? 'top-4 md:left-4' 
+              : 'top-[68px] md:top-4 md:left-[290px]'
+            }
+          `}
+        />
 
-        {/* FilterPanel en Escritorio */}
-        <div className="hidden md:block">
-          <FilterPanel 
-            showReports={showReports}
-            onShowReportsChange={setShowReports}
-            showNews={showNews}
-            onShowNewsChange={setShowNews}
-            selectedStatuses={selectedStatuses}
-            onStatusesChange={setSelectedStatuses}
-            selectedDateRange={selectedDateRange}
-            onDateRangeChange={setSelectedDateRange}
-            selectedTags={selectedTags}
-            onTagsChange={setSelectedTags}
-            isHeatmapVisible={isHeatmapVisible}
-            onToggleHeatmap={setIsHeatmapVisible}
-            activeBaseMap={activeBaseMap}
-            onChangeBaseMap={setActiveBaseMap}
-            className="top-4 right-4"
-          />
-        </div>
+        <FilterPanel 
+          showReports={showReports}
+          onShowReportsChange={setShowReports}
+          showNews={showNews}
+          onShowNewsChange={setShowNews}
+          selectedStatuses={selectedStatuses}
+          onStatusesChange={setSelectedStatuses}
+          selectedDateRange={selectedDateRange}
+          onDateRangeChange={setSelectedDateRange}
+          selectedTags={selectedTags}
+          onTagsChange={setSelectedTags}
+          isHeatmapVisible={isHeatmapVisible}
+          onToggleHeatmap={setIsHeatmapVisible}
+          activeBaseMap={activeBaseMap}
+          onChangeBaseMap={setActiveBaseMap}
+          className={`transition-all duration-300 right-4 md:right-4 md:top-4
+            ${isSidebarOpen 
+              ? 'top-[68px]' 
+              : 'top-[132px]'
+            }
+          `}
+        />
 
-        {/* Contenedor del Mapa Leaflet */}
         <MapContainer 
           center={ASUNCION_CENTER} 
           zoom={13} 
