@@ -357,6 +357,7 @@ export default function MapView() {
           onSelectLocation={handleSelectLocation}
           className={`fixed top-[52px] md:top-[76px] left-1/2 -translate-x-1/2 z-[3000] transition-all duration-300 
             w-[calc(100vw-110px)] max-w-[200px] sm:max-w-[240px] md:w-64 lg:w-72 md:max-w-none
+            ${isSidebarOpen ? 'hidden md:block' : 'block'}
           `}
         />
 
