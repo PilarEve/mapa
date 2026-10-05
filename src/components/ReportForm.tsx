@@ -257,21 +257,22 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[3000] bg-slate-900/60 backdrop-blur-sm flex items-end md:items-center justify-center md:p-4 transition-all">
-      <div className="bg-white md:rounded-3xl rounded-t-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-300">
+    <div className="fixed inset-0 z-[3500] bg-slate-900/60 backdrop-blur-sm flex items-end md:items-center justify-center p-0 pt-[calc(3rem+0.5rem)] md:p-4 transition-all">
+      <div className="bg-white md:rounded-3xl rounded-t-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-300 flex flex-col max-h-full">
         
-        <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white p-6 flex justify-between items-center relative overflow-hidden">
+        <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white px-4 py-4 md:p-6 flex justify-between items-center relative overflow-hidden shrink-0">
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-          <h2 className="text-xl font-bold relative z-10">Nuevo Reporte Ciudadano</h2>
+          <h2 className="text-lg md:text-xl font-bold relative z-10 pr-2">Nuevo Reporte Ciudadano</h2>
           <button 
             onClick={onClose} 
-            className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full backdrop-blur-sm transition-colors relative z-10"
+            className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-full backdrop-blur-sm transition-colors relative z-10 shrink-0"
+            aria-label="Cerrar formulario"
           >
-            <X size={20} />
+            <X size={18} className="md:w-5 md:h-5" />
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="form-scrollable p-6 space-y-5 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200">
+        <form onSubmit={handleSubmit} className="form-scrollable p-4 md:p-6 space-y-4 md:space-y-5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 flex-1">
           <div className="space-y-3 border border-slate-100 rounded-2xl p-4 bg-slate-50/30">
             <div className="flex justify-between items-start select-none">
               <div>
