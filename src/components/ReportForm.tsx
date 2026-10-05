@@ -16,6 +16,7 @@ const AVAILABLE_TAGS = [
   'Fallecimiento reportado',
   'Interrupción de tránsito',
   'Servicio público afectado',
+  'Acumulación de basura',
   'Sin daños visibles'
 ];
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';

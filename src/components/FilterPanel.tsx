@@ -13,6 +13,7 @@ const AVAILABLE_TAGS = [
   'Sin daños visibles',
   'Interrupción de tránsito',
   'Servicio público afectado',
+  'Acumulación de basura',
   'Fallecimiento reportado'
 ];
 
