@@ -45,7 +45,7 @@ export default function SearchBar({ onSelectLocation, className = '' }: SearchBa
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
           searchQuery
-        )}&countrycodes=py&limit=6&addressdetails=1&accept-language=es`
+        )}&countrycodes=py&viewbox=-57.75,-25.15,-57.45,-25.40&limit=6&addressdetails=1&accept-language=es`
       );
 
       if (!response.ok) {
@@ -81,7 +81,7 @@ export default function SearchBar({ onSelectLocation, className = '' }: SearchBa
 
     const timer = setTimeout(() => {
       searchLocation(query);
-    }, 600);
+    }, 400);
 
     return () => clearTimeout(timer);
   }, [query]);
@@ -132,16 +132,16 @@ export default function SearchBar({ onSelectLocation, className = '' }: SearchBa
   return (
     <div 
       ref={dropdownRef}
-      className={`w-full bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200/60 z-[1000] relative select-none ${className}`}
+      className={`w-full bg-white rounded-xl shadow-md border border-slate-200/60 z-[1000] relative select-none ${className}`}
       onClick={handleInteraction}
       onMouseDown={handleInteraction}
       onDoubleClick={handleInteraction}
       onTouchStart={handleInteraction}
       onWheel={handleInteraction}
     >
-      <form onSubmit={handleSubmit} className="flex items-center h-12 md:h-13 px-4 gap-2">
+      <form onSubmit={handleSubmit} className="flex items-center h-9 md:h-9.5 px-3 gap-1.5">
         <button type="submit" className="text-slate-400 hover:text-slate-600 transition-colors flex items-center justify-center cursor-pointer">
-          <Search size={20} className="stroke-[2.5]" />
+          <Search size={16} className="stroke-[2.2]" />
         </button>
         
         <input
@@ -155,20 +155,20 @@ export default function SearchBar({ onSelectLocation, className = '' }: SearchBa
             }
           }}
           placeholder="Buscar una ubicación"
-          className="flex-1 bg-transparent border-none outline-none text-slate-800 placeholder-slate-400 font-medium text-sm md:text-base w-full h-full"
+          className="flex-1 bg-transparent border-none outline-none text-slate-800 placeholder-slate-400 font-medium text-xs md:text-sm w-full h-full"
         />
 
         {loading && (
-          <Loader2 size={18} className="text-blue-600 animate-spin mr-1" />
+          <Loader2 size={15} className="text-blue-600 animate-spin mr-0.5" />
         )}
 
         {query && !loading && (
           <button 
             type="button" 
             onClick={handleClear}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-all flex items-center justify-center cursor-pointer"
+            className="text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-all flex items-center justify-center cursor-pointer"
           >
-            <X size={18} className="stroke-[2.5]" />
+            <X size={15} className="stroke-[2.2]" />
           </button>
         )}
       </form>

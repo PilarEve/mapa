@@ -172,6 +172,11 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
       return;
     }
 
+    if (!imageFile) {
+      alert("Debés adjuntar una evidencia fotográfica obligatoria para enviar el reporte.");
+      return;
+    }
+
     setIsSubmitting(true);
     let finalImageUrl = null;
     let archivoTipo: 'imagen' | null = null;
@@ -405,7 +410,9 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
 
           {/* Evidencia fotográfica */}
           <div className="space-y-3">
-            <label className="text-sm font-bold text-slate-600">Evidencia fotográfica</label>
+            <label className="text-sm font-bold text-slate-700">
+              Evidencia fotográfica <span className="text-red-500">*</span>
+            </label>
             
             {!filePreviewUrl ? (
               <div 
@@ -464,10 +471,15 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
                 </div>
               </div>
             )}
-            {imageFile && (
+            {imageFile ? (
               <p className="text-xs text-green-600 mt-2 font-bold flex items-center gap-1.5 select-none">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span> 
                 Imagen adjuntada correctamente.
+              </p>
+            ) : (
+              <p className="text-xs text-amber-600 mt-1 font-semibold flex items-center gap-1">
+                <AlertTriangle size={13} className="shrink-0 text-amber-500" />
+                Evidencia fotográfica requerida para poder enviar el reporte.
               </p>
             )}
           </div>
@@ -475,8 +487,12 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
           <div className="pt-6 pb-2">
             <button 
               type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-4 px-6 rounded-xl shadow-[0_8px_20px_rgb(37,99,235,0.3)] hover:shadow-[0_8px_25px_rgb(37,99,235,0.4)] transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2"
+              disabled={isSubmitting || !imageFile}
+              className={`w-full font-bold py-4 px-6 rounded-xl transition-all transform flex items-center justify-center gap-2 ${
+                !imageFile
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                  : 'bg-blue-700 hover:bg-blue-800 text-white shadow-[0_8px_20px_rgb(37,99,235,0.3)] hover:shadow-[0_8px_25px_rgb(37,99,235,0.4)] hover:-translate-y-0.5 active:translate-y-0 cursor-pointer'
+              }`}
             >
               {isSubmitting ? (
                 <>

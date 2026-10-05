@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function MapaPage() {
   return (
-    <main className="w-full h-full min-h-full overflow-hidden bg-slate-100 relative">
+    <main className="w-full h-[calc(100dvh-4rem)] overflow-hidden bg-slate-100 relative flex flex-col">
       <MapClient />
     </main>
   );

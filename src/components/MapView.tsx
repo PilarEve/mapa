@@ -21,22 +21,25 @@ import CustomZoomControl from './CustomZoomControl';
 const ASUNCION_CENTER: [number, number] = [-25.2855, -57.6150];
 
 const BASE_MAPS = {
+  light: {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+    maxNativeZoom: 16
+  },
   voyager: {
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  },
-  light: {
-    url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles style by Humanitarian OpenStreetMap Team'
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxNativeZoom: 19
   },
   satellite: {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+    maxNativeZoom: 19
   }
 };
 
 export default function MapView() {
-  const [reports, setReports] = useState<Report[]>([]); // Inicializamos vacío
+  const [reports, setReports] = useState<Report[]>([]);
   const [news, setNews] = useState<NoticiaHistorica[]>([]);
   const [loading, setLoading] = useState(true);
   const [showReports, setShowReports] = useState<boolean>(true);
@@ -50,26 +53,19 @@ export default function MapView() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeBaseMap, setActiveBaseMap] = useState<'voyager' | 'light' | 'satellite'>('light');
 
-  // Ajustar la visibilidad inicial según el ancho de la pantalla
+  // Ajustar visibilidad inicial en celular
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setIsSidebarOpen(false);
     }
   }, []);
 
-  // Evitar scroll en el body y html de la página
+  // Bloquear scroll de la ventana para mantener los controles fijos bajo el header
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    const originalBodyOverflow = document.body.style.overflow;
-    const originalBodyHeight = document.body.style.height;
-    const originalHtmlOverflow = document.documentElement.style.overflow;
-    const originalHtmlHeight = document.documentElement.style.height;
-
     document.body.style.overflow = 'hidden';
-    document.body.style.height = '100%';
     document.documentElement.style.overflow = 'hidden';
-    document.documentElement.style.height = '100%';
 
     const handleScroll = () => {
       if (window.scrollY !== 0 || window.scrollX !== 0) {
@@ -77,11 +73,9 @@ export default function MapView() {
       }
     };
 
-    const preventContainerScroll = (e: Event) => {
+    const handleTouchMove = (e: TouchEvent) => {
       const target = e.target as HTMLElement;
-      if (!target || !target.tagName) return;
-
-      // Permitir scroll en áreas correspondientes (sidebar, filtros, formularios, etc.)
+      if (!target) return;
       if (
         target.closest('.sidebar-scrollable') || 
         target.closest('.filter-scrollable') || 
@@ -91,40 +85,36 @@ export default function MapView() {
       ) {
         return;
       }
-
-      if (target.scrollTop !== 0) {
-        target.scrollTop = 0;
-      }
-      if (target.scrollLeft !== 0) {
-        target.scrollLeft = 0;
+      if (e.cancelable) {
+        e.preventDefault();
       }
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: false });
-    window.addEventListener('scroll', preventContainerScroll, { capture: true, passive: true });
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
 
     return () => {
-      document.body.style.overflow = originalBodyOverflow;
-      document.body.style.height = originalBodyHeight;
-      document.documentElement.style.overflow = originalHtmlOverflow;
-      document.documentElement.style.height = originalHtmlHeight;
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
       window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('scroll', preventContainerScroll, { capture: true });
+      window.removeEventListener('touchmove', handleTouchMove);
     };
   }, []);
 
-  // Invalidar el tamaño del mapa de Leaflet cuando el sidebar se colapsa/despliega
+  // Invalidar el tamaño del mapa de Leaflet al cambiar el sidebar
   useEffect(() => {
     if (mapRef) {
       const timer = setTimeout(() => {
         mapRef.invalidateSize();
-      }, 350); // Ligeramente mayor que la transición del sidebar (300ms)
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [isSidebarOpen, mapRef]);
 
-  // Cargar reportes desde Supabase al montar el componente
+  // Cargar reportes y noticias desde Supabase
   useEffect(() => {
+    let isMounted = true;
+
     const fetchReports = async () => {
       try {
         setLoading(true);
@@ -133,16 +123,12 @@ export default function MapView() {
           .select('*')
           .order('creado_en', { ascending: false });
 
+        if (!isMounted) return;
+
         if (error) {
-          console.error('Error fetching reports:', {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint
-          });
+          console.error('Error fetching reports:', error.message);
           setReports(mockReports);
         } else if (data) {
-          // Mapeamos los datos de la DB a nuestro formato de Report
           const mappedReports: Report[] = data.map(dbReport => ({
             id: dbReport.id,
             lat: Number(dbReport.latitud),
@@ -162,13 +148,10 @@ export default function MapView() {
           .select('*')
           .order('fecha_publicacion', { ascending: false });
 
+        if (!isMounted) return;
+
         if (newsError) {
-          console.error('Error fetching news:', {
-            message: newsError.message,
-            code: newsError.code,
-            details: newsError.details,
-            hint: newsError.hint
-          });
+          console.error('Error fetching news:', newsError.message);
         } else if (newsData) {
           const validNews = newsData
             .filter(n => 
@@ -179,40 +162,38 @@ export default function MapView() {
               !isNaN(Number(n.latitud)) && 
               !isNaN(Number(n.longitud))
             )
-            .map(n => {
-              const parsedLat = Number(n.latitud);
-              const parsedLng = Number(n.longitud);
-              console.log('Noticia Histórica:', n.titulo, '| Lat:', parsedLat, '| Lng:', parsedLng);
-              return {
-                ...n,
-                latitud: parsedLat,
-                longitud: parsedLng
-              };
-            }) as NoticiaHistorica[];
+            .map(n => ({
+              ...n,
+              latitud: Number(n.latitud),
+              longitud: Number(n.longitud)
+            })) as NoticiaHistorica[];
           setNews(validNews);
         }
       } catch (err) {
-        console.error('Unexpected error:', err);
-        setReports(mockReports);
+        if (isMounted) {
+          console.error('Unexpected error:', err);
+          setReports(mockReports);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchReports();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const filteredReports = useMemo(() => {
     if (!showReports) return [];
     return reports.filter(report => {
-      // 1. Filtro por afectaciones (Tags)
       const matchTags = selectedTags.length === 0 || 
         (report.impactTags && report.impactTags.some(tag => selectedTags.includes(tag)));
 
-      // 2. Filtro por estado del reporte
       const matchStatus = selectedStatuses.includes(report.status);
 
-      // 3. Filtro por fecha
       let matchDate = true;
       if (selectedDateRange !== 'todo') {
         const dateVal = report.dateTime ? new Date(report.dateTime) : null;
@@ -288,22 +269,18 @@ export default function MapView() {
   };
 
   const handleZoomIn = () => {
-    if (mapRef) {
-      mapRef.zoomIn();
-    }
+    if (mapRef) mapRef.zoomIn();
   };
 
   const handleZoomOut = () => {
-    if (mapRef) {
-      mapRef.zoomOut();
-    }
+    if (mapRef) mapRef.zoomOut();
   };
 
   return (
     <div className="flex w-full h-full min-h-0 bg-slate-50 overflow-hidden relative font-sans text-slate-800">
       
       {/* Botones Flotantes Inferiores Derechos */}
-      <div className="absolute bottom-24 right-4 md:bottom-8 md:right-8 z-[1000] flex flex-col gap-3 md:gap-4 items-end">
+      <div className="absolute bottom-5 right-4 md:bottom-8 md:right-8 z-[1000] flex flex-col gap-3 md:gap-4 items-end pointer-events-auto">
         
         {/* Control de Zoom Personalizado */}
         <CustomZoomControl onZoomIn={handleZoomIn} onZoomOut={handleZoomOut} />
@@ -311,19 +288,19 @@ export default function MapView() {
         {/* Botón Ver Reportes (Solo Móvil) */}
         <button 
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className={`md:hidden bg-white text-slate-700 font-bold py-3.5 px-5 rounded-full shadow-[0_8px_20px_rgb(0,0,0,0.15)] flex items-center gap-2 transition-all transform active:scale-95 border border-slate-200 ${isSidebarOpen ? 'bg-slate-100' : ''}`}
+          className={`md:hidden bg-white text-slate-700 font-bold py-3 px-4 rounded-full shadow-lg flex items-center gap-2 transition-all transform active:scale-95 border border-slate-200 cursor-pointer ${isSidebarOpen ? 'bg-slate-100' : ''}`}
         >
-          {isSidebarOpen ? <X size={20} /> : <ListFilter size={20} />}
-          <span className="text-sm">{isSidebarOpen ? 'Cerrar Lista' : 'Ver Reportes'}</span>
+          {isSidebarOpen ? <X size={18} /> : <ListFilter size={18} />}
+          <span className="text-xs font-semibold">{isSidebarOpen ? 'Cerrar Lista' : 'Ver Lista'}</span>
         </button>
 
         {/* Botón Flotante para Nuevo Reporte */}
         <button 
           onClick={() => setShowReportForm(true)}
-          className="bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-bold py-3.5 px-6 md:py-4 md:px-8 rounded-full shadow-2xl shadow-blue-500/30 flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 border border-blue-400/20"
+          className="bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 text-white font-bold py-3 px-5 md:py-3.5 md:px-7 rounded-full shadow-xl shadow-blue-600/30 flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 border border-blue-400/20 cursor-pointer"
         >
-          <Plus size={22} className="drop-shadow-md" />
-          <span className="text-sm md:text-base drop-shadow-md">Nuevo Reporte</span>
+          <Plus size={20} className="drop-shadow-xs" />
+          <span className="text-xs md:text-sm drop-shadow-xs font-bold">Nuevo Reporte</span>
         </button>
 
       </div>
@@ -331,17 +308,17 @@ export default function MapView() {
       {/* Overlay Oscuro para móvil cuando el sidebar está abierto */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[1500] md:hidden transition-opacity"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-[1500] md:hidden transition-opacity"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar de Lista de Reportes */}
       <div className={`
-        fixed md:relative top-0 left-0 h-full z-[2000] md:z-10
+        fixed top-16 md:top-0 left-0 h-[calc(100dvh-4rem)] md:h-full z-[2500] md:z-10 md:relative
         transform transition-all duration-300 ease-in-out
         ${isSidebarOpen 
-          ? 'translate-x-0 w-80 md:w-96 opacity-100' 
+          ? 'translate-x-0 w-[85vw] max-w-[360px] md:w-96 opacity-100' 
           : '-translate-x-full md:translate-x-0 md:w-0 md:opacity-0 md:overflow-hidden pointer-events-none'
         }
       `}>
@@ -354,41 +331,39 @@ export default function MapView() {
 
       {/* Contenedor Principal del Mapa */}
       <div className="flex-1 min-w-0 relative h-full overflow-hidden">
-        {/* Botón flotante para abrir el sidebar */}
+        {/* Botón flotante para abrir el sidebar (Reportes Recientes) */}
         <button
           onClick={() => setIsSidebarOpen(true)}
-          className={`absolute z-[1000] bg-white/95 backdrop-blur-md text-slate-800 font-bold py-3 px-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex items-center justify-between md:justify-start gap-2 border border-slate-200/50 cursor-pointer transition-all duration-300
+          className={`fixed top-[76px] z-[3000] bg-white/95 backdrop-blur-md text-slate-800 font-bold py-1.5 px-2 md:py-1.5 md:px-2.5 rounded-xl shadow-sm flex items-center gap-1.5 md:gap-2 border border-slate-200/60 cursor-pointer transition-all duration-300
             ${isSidebarOpen 
-              ? 'opacity-0 pointer-events-none -translate-y-4 md:-translate-x-4 md:translate-y-0 scale-95' 
-              : 'opacity-100 pointer-events-auto translate-y-0 translate-x-0 scale-100'
+              ? 'opacity-0 pointer-events-none -translate-x-4 scale-95' 
+              : 'opacity-100 pointer-events-auto translate-x-0 scale-100'
             }
-            top-4 left-4 right-4 md:right-auto md:w-auto
+            left-3
           `}
           title="Mostrar reportes recientes"
+          aria-label="Mostrar reportes recientes"
         >
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="text-blue-600 animate-pulse shrink-0" size={18} />
-            <span className="text-sm font-semibold truncate">Reportes Recientes</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-100 shrink-0">
-              {filteredReports.length}
-            </span>
-            <ChevronRight size={18} className="text-slate-400 hidden md:inline" />
-          </div>
+          <AlertTriangle className="text-blue-600 shrink-0" size={16} />
+          <span className="text-xs font-bold hidden md:inline">Reportes Recientes</span>
+          <span className="bg-blue-50 text-blue-700 text-[11px] font-extrabold px-1.5 py-0.5 rounded-full border border-blue-100 shrink-0">
+            {filteredReports.length}
+          </span>
+          <ChevronRight size={14} className="text-slate-400 hidden md:inline" />
         </button>
 
         {/* Barra de Búsqueda de Ubicación */}
         <SearchBar 
           onSelectLocation={handleSelectLocation}
-          className={`absolute left-4 right-4 md:right-auto md:w-80 lg:w-96 z-[1000] transition-all duration-300
+          className={`fixed top-[76px] z-[3000] transition-all duration-300 md:right-auto md:w-64 lg:w-72
             ${isSidebarOpen 
-              ? 'top-4 md:left-4' 
-              : 'top-[68px] md:top-4 md:left-[290px]'
+              ? 'left-3 right-[48px] md:left-3 md:right-auto' 
+              : 'left-[76px] right-[48px] md:left-[195px] md:right-auto'
             }
           `}
         />
 
+        {/* Panel de Filtros */}
         <FilterPanel 
           showReports={showReports}
           onShowReportsChange={setShowReports}
@@ -404,12 +379,7 @@ export default function MapView() {
           onToggleHeatmap={setIsHeatmapVisible}
           activeBaseMap={activeBaseMap}
           onChangeBaseMap={setActiveBaseMap}
-          className={`transition-all duration-300 right-4 md:right-4 md:top-4
-            ${isSidebarOpen 
-              ? 'top-[68px]' 
-              : 'top-[132px]'
-            }
-          `}
+          className="fixed top-[76px] right-3 z-[3000]"
         />
 
         <MapContainer 
@@ -422,8 +392,11 @@ export default function MapView() {
         >
           {/* Mapa Base Dinámico */}
           <TileLayer
+            key={activeBaseMap}
             url={BASE_MAPS[activeBaseMap].url}
             attribution={BASE_MAPS[activeBaseMap].attribution}
+            maxNativeZoom={BASE_MAPS[activeBaseMap].maxNativeZoom}
+            maxZoom={19}
           />
 
           {!isHeatmapVisible && filteredReports.map(report => (
@@ -448,13 +421,16 @@ export default function MapView() {
           onSubmit={handleAddReport} 
         />
       )}
+      
       {/* Indicador de Carga */}
       {loading && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[3000] bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-lg border border-blue-100 flex items-center gap-2">
-          <Loader2 size={18} className="text-blue-600 animate-spin" />
-          <span className="text-sm font-medium text-slate-600">Actualizando datos...</span>
+          <Loader2 size={16} className="text-blue-600 animate-spin" />
+          <span className="text-xs font-semibold text-slate-700">Cargando datos del mapa...</span>
         </div>
       )}
     </div>
   );
 }
+
+

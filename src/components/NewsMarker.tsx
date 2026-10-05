@@ -1,132 +1,131 @@
 "use client";
 
+import { useMemo } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { NoticiaHistorica } from '../types/report';
 import { format } from 'date-fns';
-import Image from 'next/image';
+import { Calendar, ExternalLink, MapPin, AlertCircle, FileText } from 'lucide-react';
 
-const ORANGE_COLOR = '#f97316'; // orange-500
-
-const createCustomIcon = () => {
+const createNewsIcon = () => {
   const svgIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${ORANGE_COLOR}" width="32" height="32" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#d97706" width="24" height="24" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-      <circle cx="12" cy="10" r="3" fill="white"></circle>
+      <circle cx="12" cy="10" r="3" fill="#ffffff"></circle>
     </svg>
   `;
 
   return L.divIcon({
     className: 'custom-leaflet-icon bg-transparent border-0',
     html: svgIcon,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32],
+    iconSize: [24, 24],
+    iconAnchor: [12, 24],
+    popupAnchor: [0, -24],
   });
 };
+
+const NEWS_ICON = createNewsIcon();
 
 interface NewsMarkerProps {
   news: NoticiaHistorica;
 }
 
 export default function NewsMarker({ news }: NewsMarkerProps) {
-  const icon = createCustomIcon();
+  const icon = useMemo(() => NEWS_ICON, []);
   
-  // Requirement 1: Fallback description
   const descripcionMostrar = news.descripcion?.trim() || news.titulo;
-  
-  // Utility for conditional rendering Requirement 3
-  const hasValue = (val: string | undefined | null) => val && val.trim() !== "";
+  const hasValue = (val: string | undefined | null) => Boolean(val && val.trim() !== "");
+
+  const formattedDate = useMemo(() => {
+    if (!news.fecha_publicacion) return null;
+    try {
+      return format(new Date(news.fecha_publicacion), 'dd/MM/yyyy');
+    } catch {
+      return news.fecha_publicacion;
+    }
+  }, [news.fecha_publicacion]);
 
   return (
     <Marker position={[news.latitud, news.longitud]} icon={icon}>
       <Popup className="report-popup custom-news-popup">
-        <div className="w-56 sm:w-60 flex flex-col gap-1 p-0.5">
-          {/* Badge aligned left, like Reporte Ciudadano */}
-          <div className="flex justify-between items-center gap-2">
-            <span className="text-[10px] uppercase font-extrabold tracking-widest text-orange-700">
-              NOTICIA HISTÓRICA
-            </span>
-          </div>
+        <div className="w-[280px] sm:w-[320px] max-w-[85vw] p-3 flex flex-col gap-2.5 font-sans">
           
-          <h3 className="font-bold text-gray-900 text-sm leading-tight uppercase tracking-tight mt-0.5">
+          {/* Header con insignias unificadas */}
+          <div className="flex justify-between items-center gap-2 border-b border-slate-100 pb-2">
+            <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+              Noticia Histórica
+            </span>
+            {hasValue(news.gravedad) && (
+              <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize">
+                Gravedad: {news.gravedad}
+              </span>
+            )}
+          </div>
+
+          {/* Título de la Noticia */}
+          <h3 className="font-bold text-slate-900 text-sm leading-snug">
             {news.titulo}
           </h3>
-          
+
+          {/* Imagen de la noticia */}
           {news.imagen_url && (
-            <div className="w-full h-24 sm:h-28 relative rounded overflow-hidden border border-gray-100">
-              <Image 
+            <div className="w-full h-40 sm:h-44 relative rounded-xl overflow-hidden shadow-sm border border-slate-100 bg-slate-900 flex items-center justify-center">
+              <img 
                 src={news.imagen_url} 
-                alt="Imagen asociada a noticia histórica de inundación" 
-                fill
-                className="object-cover"
-                sizes="(max-width: 640px) 224px, 240px"
+                alt="Imagen asociada a la noticia histórica" 
+                className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                loading="lazy"
               />
             </div>
           )}
 
-          <div className="text-sm text-gray-700 px-0.5">
-            <p className="leading-tight">
-              {descripcionMostrar}
-            </p>
-          </div>
+          {/* Descripción */}
+          <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal max-h-24 overflow-y-auto">
+            {descripcionMostrar}
+          </p>
 
-          <div className="text-xs text-gray-500 grid grid-cols-2 gap-x-2 gap-y-0 border-t border-gray-50 pt-1">
-            {hasValue(news.fecha_publicacion) && (
-              <p className="flex items-center gap-1">
-                <span>Fecha:</span> 
-                <span className="text-gray-600 truncate">
-                  {format(new Date(news.fecha_publicacion), 'dd/MM/yyyy')}
-                </span>
-              </p>
+          {/* Pie de datos unificado */}
+          <div className="pt-2 border-t border-slate-100 flex flex-col gap-1 text-[11px] text-slate-500 font-medium">
+            {formattedDate && (
+              <div className="flex items-center gap-1.5 text-slate-600">
+                <Calendar size={13} className="text-slate-400 shrink-0" />
+                <span>Fecha: {formattedDate}</span>
+              </div>
             )}
             
-            {hasValue(news.tipo_evento) && (
-              <p className="flex items-center gap-1">
-                <span>Tipo:</span> 
-                <span className="capitalize text-gray-600 truncate">{news.tipo_evento}</span>
-              </p>
-            )}
-            
-            {hasValue(news.gravedad) && (
-              <p className="flex items-center gap-1">
-                <span>Gravedad:</span> 
-                <span className="capitalize font-bold text-orange-600 truncate">
-                  {news.gravedad}
-                </span>
-              </p>
-            )}
-
             {hasValue(news.fuente) && (
-              <p className="flex items-center gap-1">
-                <span>Fuente:</span> 
-                <span className="text-gray-600 italic truncate">{news.fuente}</span>
-              </p>
+              <div className="flex items-center gap-1.5 text-slate-600">
+                <FileText size={13} className="text-slate-400 shrink-0" />
+                <span>Fuente: <span className="italic text-slate-700">{news.fuente}</span></span>
+              </div>
             )}
 
             {hasValue(news.ubicacion_texto) && (
-              <p className="flex items-start gap-1 col-span-2 mt-0.5 border-t border-gray-50/50 pt-0.5">
-                <span className="shrink-0">Ubicación:</span> 
-                <span className="flex-1 text-gray-600 leading-tight">{news.ubicacion_texto}</span>
-              </p>
+              <div className="flex items-start gap-1.5 text-slate-600 mt-0.5">
+                <MapPin size={13} className="text-slate-400 shrink-0 mt-0.5" />
+                <span className="line-clamp-1">{news.ubicacion_texto}</span>
+              </div>
             )}
           </div>
 
-          {/* 9. Enlace URL Requirement 5 */}
+          {/* Botón Acción - Ver noticia completa */}
           {news.url && (
-            <div className="mt-0.5">
+            <div className="pt-1">
               <a 
                 href={news.url} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-[10px] font-extrabold text-white bg-orange-500 hover:bg-orange-600 transition-all duration-200 w-full text-center block py-1 rounded shadow-sm uppercase tracking-widest"
+                className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 hover:border-amber-300 transition-all duration-200 py-2 rounded-xl text-center shadow-2xs"
               >
-                Ver Noticia Completa
+                <span>Ver Noticia Completa</span>
+                <ExternalLink size={13} />
               </a>
             </div>
           )}
+
         </div>
       </Popup>
     </Marker>
   );
 }
+

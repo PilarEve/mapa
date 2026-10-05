@@ -29,9 +29,9 @@ export default function RootLayout({
     <html
       lang="es"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-dvh antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-dvh max-h-dvh overflow-hidden antialiased`}
     >
-      <body className="h-full flex flex-col bg-slate-50 text-slate-900">
+      <body className="h-dvh max-h-dvh flex flex-col overflow-hidden bg-slate-50 text-slate-900">
         <Navigation />
         {children}
       </body>
