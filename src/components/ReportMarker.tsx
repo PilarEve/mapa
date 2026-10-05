@@ -75,7 +75,7 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
   return (
     <Marker position={[report.lat, report.lng]} icon={icon}>
       <Popup className="report-popup custom-report-popup">
-        <div className="w-[280px] sm:w-[320px] max-w-[85vw] p-3 flex flex-col gap-2.5 font-sans">
+        <div className="w-[260px] sm:w-[300px] max-w-[80vw] p-2.5 flex flex-col gap-2 font-sans">
           
           {/* Header con insignias unificadas */}
           <div className="flex justify-between items-center gap-2 border-b border-slate-100 pb-2">

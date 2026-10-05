@@ -64,20 +64,20 @@ export default function Navigation() {
   };
 
   return (
-    <header className="h-16 border-b border-slate-200/80 bg-white/90 backdrop-blur-md sticky top-0 z-[4000] w-full font-sans transition-all duration-200">
-      <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+    <header className="h-12 md:h-16 border-b border-slate-200/80 bg-white/90 backdrop-blur-md sticky top-0 z-[4000] w-full font-sans transition-all duration-200">
+      <div className="max-w-7xl mx-auto h-full px-3 sm:px-6 lg:px-8 flex items-center justify-between">
         
         {/* Brand / Logo */}
         <Link 
           href="/" 
           onClick={() => setIsOpen(false)}
-          className="flex items-center gap-2.5 group focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg p-1"
+          className="flex items-center gap-2 md:gap-2.5 group focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-lg p-0.5"
           aria-label="Monitoreo Inundaciones - Ir a la página de inicio"
         >
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform duration-200">
+          <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-base md:text-lg shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform duration-200">
             M
           </div>
-          <span className="font-bold text-lg text-slate-800 tracking-tight group-hover:text-blue-600 transition-colors">
+          <span className="font-bold text-base md:text-lg text-slate-800 tracking-tight group-hover:text-blue-600 transition-colors">
             Monitoreo Asunción
           </span>
         </Link>
@@ -113,12 +113,12 @@ export default function Navigation() {
           ref={buttonRef}
           onClick={() => setIsOpen(!isOpen)}
           type="button"
-          className="md:hidden inline-flex items-center justify-center p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+          className="md:hidden inline-flex items-center justify-center p-1.5 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
           aria-controls="mobile-menu"
           aria-expanded={isOpen}
           aria-label={isOpen ? "Cerrar menú de navegación" : "Abrir menú de navegación"}
         >
-          {isOpen ? <X size={24} /> : <Menu size={24} />}
+          {isOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
       </div>
 
@@ -134,7 +134,7 @@ export default function Navigation() {
       <div
         id="mobile-menu"
         ref={menuRef}
-        className={`fixed top-16 right-0 w-72 h-[calc(100dvh-4rem)] bg-white shadow-2xl border-l border-slate-100 z-[3995] md:hidden transform transition-transform duration-300 ease-out flex flex-col justify-between ${
+        className={`fixed top-12 md:top-16 right-0 w-72 h-[calc(100dvh-3rem)] md:h-[calc(100dvh-4rem)] bg-white shadow-2xl border-l border-slate-100 z-[3995] md:hidden transform transition-transform duration-300 ease-out flex flex-col justify-between ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
         role="dialog"

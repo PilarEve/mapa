@@ -98,16 +98,16 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
           setLat(position.coords.latitude.toString());
           setLng(position.coords.longitude.toString());
           setIsLocating(false);
-          setIsMapOpen(true); // Desplegar mapa para confirmación visual
+          setIsMapOpen(false); // NO desplegar el mapa de selección manual al usar GPS
         },
         (error) => {
           console.error("Error al obtener ubicación", error);
-          alert("No se pudo obtener la ubicación. Por favor, ingrese las coordenadas manualmente.");
+          alert("No se pudo obtener la ubicación automáticamente. Por favor, usá la opción 'Ubicar manualmente'.");
           setIsLocating(false);
         }
       );
     } else {
-      alert("Geolocalización no soportada por el navegador.");
+      alert("Geolocalización no soportada por el navegador. Por favor, usá la opción 'Ubicar manualmente'.");
       setIsLocating(false);
     }
   };

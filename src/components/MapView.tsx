@@ -291,7 +291,7 @@ export default function MapView() {
           className={`md:hidden bg-white text-slate-700 font-bold py-3 px-4 rounded-full shadow-lg flex items-center gap-2 transition-all transform active:scale-95 border border-slate-200 cursor-pointer ${isSidebarOpen ? 'bg-slate-100' : ''}`}
         >
           {isSidebarOpen ? <X size={18} /> : <ListFilter size={18} />}
-          <span className="text-xs font-semibold">{isSidebarOpen ? 'Cerrar Lista' : 'Ver Lista'}</span>
+          <span className="text-xs font-semibold">{isSidebarOpen ? 'Cerrar Lista' : 'Ver Reportes'}</span>
         </button>
 
         {/* Botón Flotante para Nuevo Reporte */}
@@ -334,7 +334,7 @@ export default function MapView() {
         {/* Botón flotante para abrir el sidebar (Reportes Recientes) */}
         <button
           onClick={() => setIsSidebarOpen(true)}
-          className={`fixed top-[76px] z-[3000] bg-white/95 backdrop-blur-md text-slate-800 font-bold py-1.5 px-2 md:py-1.5 md:px-2.5 rounded-xl shadow-sm flex items-center gap-1.5 md:gap-2 border border-slate-200/60 cursor-pointer transition-all duration-300
+          className={`fixed top-[52px] md:top-[76px] z-[3000] bg-white/95 backdrop-blur-md text-slate-800 font-bold h-9 px-2.5 md:h-auto md:py-1.5 md:px-2.5 rounded-xl shadow-sm flex items-center justify-center gap-1.5 md:gap-2 border border-slate-200/60 cursor-pointer transition-all duration-300
             ${isSidebarOpen 
               ? 'opacity-0 pointer-events-none -translate-x-4 scale-95' 
               : 'opacity-100 pointer-events-auto translate-x-0 scale-100'
@@ -355,11 +355,8 @@ export default function MapView() {
         {/* Barra de Búsqueda de Ubicación */}
         <SearchBar 
           onSelectLocation={handleSelectLocation}
-          className={`fixed top-[76px] z-[3000] transition-all duration-300 md:right-auto md:w-64 lg:w-72
-            ${isSidebarOpen 
-              ? 'left-3 right-[48px] md:left-3 md:right-auto' 
-              : 'left-[76px] right-[48px] md:left-[195px] md:right-auto'
-            }
+          className={`fixed top-[52px] md:top-[76px] left-1/2 -translate-x-1/2 z-[3000] transition-all duration-300 
+            w-[calc(100vw-110px)] max-w-[200px] sm:max-w-[240px] md:w-64 lg:w-72 md:max-w-none
           `}
         />
 
@@ -379,7 +376,7 @@ export default function MapView() {
           onToggleHeatmap={setIsHeatmapVisible}
           activeBaseMap={activeBaseMap}
           onChangeBaseMap={setActiveBaseMap}
-          className="fixed top-[76px] right-3 z-[3000]"
+          className="fixed top-[52px] md:top-[76px] right-3 z-[3000]"
         />
 
         <MapContainer 

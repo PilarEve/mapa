@@ -98,21 +98,21 @@ export default function FilterPanel({
   ];
 
   return (
-    <div className={`absolute z-[2000] bg-white/95 backdrop-blur-md shadow-md border border-slate-200/60 transition-all duration-300 flex flex-col max-h-[calc(100dvh-2rem)] md:max-h-[calc(100dvh-3rem)] ${
+    <div className={`fixed top-[52px] md:top-[76px] right-3 z-[3000] bg-white/95 backdrop-blur-md shadow-sm border border-slate-200/60 transition-all duration-300 flex flex-col max-h-[calc(100dvh-6rem)] md:max-h-[calc(100dvh-3rem)] ${
       isExpanded 
         ? 'w-[calc(100vw-2rem)] max-w-[270px] md:w-64 rounded-xl' 
-        : 'w-auto md:w-64 rounded-xl'
+        : 'w-9 h-9 md:w-auto md:h-auto rounded-xl'
     } ${className}`}>
       
       {/* Header / Toggle Button */}
       <button 
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-1.5 md:p-2 focus:outline-none cursor-pointer select-none gap-1.5 shrink-0"
+        className="w-full h-full flex items-center justify-center p-0 md:p-2 focus:outline-none cursor-pointer select-none gap-1.5 shrink-0"
         title="Filtros y Visualización"
         aria-label="Filtros y Visualización"
       >
         <div className="flex items-center gap-1.5 text-slate-800 font-bold text-xs">
-          <div className="bg-blue-100/80 p-1 rounded-lg text-blue-600 shrink-0">
+          <div className="text-blue-600 shrink-0">
             <Layers size={16} />
           </div>
           <span className={`${isExpanded ? 'inline' : 'hidden md:inline'}`}>Visualización</span>
