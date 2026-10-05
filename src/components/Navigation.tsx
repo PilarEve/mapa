@@ -13,6 +13,18 @@ export default function Navigation() {
 
 
 
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   // Handle ESC key press
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -78,7 +90,7 @@ export default function Navigation() {
             M
           </div>
           <span className="font-bold text-base md:text-lg text-slate-800 tracking-tight group-hover:text-blue-600 transition-colors">
-            Monitoreo Asunción
+            Monitoreo de Inundaciones
           </span>
         </Link>
 
@@ -125,8 +137,9 @@ export default function Navigation() {
       {/* Mobile Drawer Overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[3990] md:hidden transition-opacity" 
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[4005] md:hidden transition-opacity" 
           aria-hidden="true" 
+          onClick={() => setIsOpen(false)}
         />
       )}
 
@@ -134,14 +147,27 @@ export default function Navigation() {
       <div
         id="mobile-menu"
         ref={menuRef}
-        className={`fixed top-12 md:top-16 right-0 w-72 h-[calc(100dvh-3rem)] md:h-[calc(100dvh-4rem)] bg-white shadow-2xl border-l border-slate-100 z-[3995] md:hidden transform transition-transform duration-300 ease-out flex flex-col justify-between ${
+        className={`fixed inset-0 w-full h-[100dvh] bg-white z-[4010] md:hidden transform transition-transform duration-300 ease-out flex flex-col justify-between ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
         role="dialog"
         aria-modal="true"
         aria-label="Menú móvil"
       >
-        <nav className="p-4 flex flex-col gap-2" aria-label="Navegación móvil">
+        {/* Mobile Drawer Header */}
+        <div className="h-9 px-3 border-b border-slate-100 flex items-center justify-end">
+          <button
+            onClick={() => setIsOpen(false)}
+            type="button"
+            className="p-1 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            aria-label="Cerrar menú"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Mobile Nav Options */}
+        <nav className="p-2.5 pt-2 flex flex-col gap-1.5 flex-1 overflow-y-auto" aria-label="Navegación móvil">
           {navLinks.map((link) => {
             const Active = isActive(link.href);
             const Icon = link.icon;
@@ -150,26 +176,28 @@ export default function Navigation() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setIsOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-base font-semibold transition-all duration-200 outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150 outline-none focus:ring-2 focus:ring-blue-500 ${
                   Active
-                    ? 'text-blue-600 bg-blue-50'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/60'
+                    ? 'text-blue-600 bg-blue-50 font-semibold'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100/70'
                 }`}
                 aria-current={Active ? 'page' : undefined}
               >
-                <Icon size={20} className={Active ? 'text-blue-600' : 'text-slate-400'} />
+                <Icon size={18} className={Active ? 'text-blue-600' : 'text-slate-400'} />
                 {link.label}
               </Link>
             );
           })}
         </nav>
-        
-        <div className="p-6 border-t border-slate-100 bg-slate-50">
-          <p className="text-xs text-slate-400 text-center font-medium">
-            Plataforma de Monitoreo de Inundaciones © 2026
+
+        {/* Mobile Drawer Footer */}
+        <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+          <p className="text-[11px] text-slate-400 text-center font-normal">
+            Monitoreo Asunción © 2026
           </p>
         </div>
       </div>
     </header>
   );
 }
+
