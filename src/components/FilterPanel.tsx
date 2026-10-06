@@ -54,18 +54,32 @@ export default function FilterPanel({
 }: FilterPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
-    datos: true,
-    mapaBase: true,
-    estado: true,
+    datos: false,
+    mapaBase: false,
+    estado: false,
     fecha: false,
     afectaciones: false,
     opciones: false
   });
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
-      setIsExpanded(true);
-    }
+    const handleResize = () => {
+      if (typeof window !== 'undefined') {
+        if (window.innerWidth < 768) {
+          setIsExpanded(false);
+        } else {
+          setIsExpanded(true);
+        }
+      }
+    };
+    
+    // Initial check on mount
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   const toggleSection = (section: keyof typeof expandedSections) => {
