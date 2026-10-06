@@ -258,61 +258,55 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[3500] bg-slate-900/60 backdrop-blur-sm flex items-end md:items-center justify-center p-0 pt-[calc(3rem+0.5rem)] md:p-4 transition-all">
-      <div className="bg-white md:rounded-3xl rounded-t-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-300 flex flex-col max-h-full">
+    <div className="fixed inset-0 z-[3500] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 md:p-6 transition-all">
+      <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[86vh] md:max-h-[90vh] my-auto">
         
-        <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white px-3 py-2.5 md:p-6 flex justify-between items-center relative overflow-hidden shrink-0">
+        <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white px-4 py-3 md:px-6 md:py-4 flex justify-between items-center relative overflow-hidden shrink-0">
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
           <h2 className="text-base md:text-xl font-bold relative z-10 pr-2">Nuevo Reporte Ciudadano</h2>
           <button 
             onClick={onClose} 
-            className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-1 md:p-2 rounded-full backdrop-blur-sm transition-colors relative z-10 shrink-0"
+            className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-1.5 md:p-2 rounded-full backdrop-blur-sm transition-colors relative z-10 shrink-0"
             aria-label="Cerrar formulario"
           >
             <X size={16} className="md:w-5 md:h-5" />
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="form-scrollable p-2.5 sm:p-4 md:p-6 space-y-2.5 md:space-y-5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 flex-1">
-          <div className="space-y-2 md:space-y-3 border border-slate-100 rounded-xl md:rounded-2xl p-2.5 md:p-4 bg-slate-50/30">
-            <div className="flex justify-between items-start select-none">
-              <div>
-                <label className="text-xs md:text-sm font-bold text-slate-700">Ubicación <span className="text-red-500">*</span></label>
-                {lat && lng && !isMapOpen && (
-                  <p className="text-[10px] md:text-xs text-green-600 font-semibold mt-0.5 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                    Ubicación seleccionada
-                  </p>
-                )}
-              </div>
+        <form onSubmit={handleSubmit} className="form-scrollable p-3 sm:p-4 md:p-6 space-y-3 md:space-y-5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 flex-1">
+          <div className="space-y-2 md:space-y-3 border border-slate-100 rounded-xl md:rounded-2xl p-3 md:p-4 bg-slate-50/30">
+            <div className="flex justify-between items-center select-none">
+              <label className="text-xs md:text-sm font-bold text-slate-700">Ubicación <span className="text-red-500">*</span></label>
+              {lat && lng && !isMapOpen && (
+                <p className="text-[10px] md:text-xs text-green-600 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                  Ubicación seleccionada
+                </p>
+              )}
             </div>
-            
-            <p className="text-[10.5px] md:text-xs text-slate-500 leading-tight">
-              Confirmá la ubicación del problema. Podés obtenerla automáticamente o marcarla en el mapa.
-            </p>
 
-            <div className="flex flex-col gap-1.5 md:flex-row">
+            <div className="grid grid-cols-2 gap-2">
               <button 
                 type="button" 
                 onClick={handleGetLocation}
                 disabled={isLocating}
-                className="flex-1 flex justify-center items-center gap-1.5 py-2 md:py-3 text-xs md:text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg md:rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-blue-100 cursor-pointer"
+                className="flex justify-center items-center gap-1.5 py-2 md:py-3 px-2 text-xs md:text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg md:rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-blue-100 cursor-pointer text-center"
               >
-                <MapPin size={15} className="md:w-4.5 md:h-4.5" /> 
-                {isLocating ? 'Obteniendo ubicación...' : 'Usar mi ubicación actual'}
+                <MapPin size={15} className="shrink-0" /> 
+                <span className="truncate">{isLocating ? 'Obteniendo...' : 'Mi ubicación'}</span>
               </button>
 
               <button 
                 type="button"
                 onClick={() => setIsMapOpen(!isMapOpen)}
-                className={`flex-1 flex justify-center items-center gap-1.5 py-2 md:py-3 text-xs md:text-sm font-bold border rounded-lg md:rounded-xl transition-all cursor-pointer ${
+                className={`flex justify-center items-center gap-1.5 py-2 md:py-3 px-2 text-xs md:text-sm font-bold border rounded-lg md:rounded-xl transition-all cursor-pointer text-center ${
                   isMapOpen 
                     ? 'bg-slate-100 border-slate-300 text-slate-700' 
                     : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
                 }`}
               >
-                <span>Ubicar manualmente</span>
-                {isMapOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                <span className="truncate">Ubicar manual</span>
+                {isMapOpen ? <ChevronUp size={14} className="shrink-0" /> : <ChevronDown size={14} className="shrink-0" />}
               </button>
             </div>
 
@@ -341,7 +335,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
             </div>
           </div>
 
-          <div className="space-y-1.5 md:space-y-3 border border-slate-100 rounded-xl md:rounded-2xl p-2.5 md:p-4 bg-slate-50/30">
+          <div className="space-y-2 md:space-y-3 border border-slate-100 rounded-xl md:rounded-2xl p-3 md:p-4 bg-slate-50/30">
             <div 
               onClick={() => setIsAfectacionesOpen(!isAfectacionesOpen)}
               className="flex items-center justify-between cursor-pointer select-none group"
@@ -363,7 +357,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
 
             <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isAfectacionesOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
               <p className="text-[10.5px] md:text-xs text-slate-500 mb-1.5 pt-0.5">Opcional. Podés seleccionar una o varias opciones.</p>
-              <div className="flex flex-wrap gap-1 md:gap-2">
+              <div className="flex flex-wrap gap-1.5 md:gap-2">
                 {AVAILABLE_TAGS.map((tag) => {
                   const isSelected = impactTags.includes(tag);
                   return (
@@ -377,7 +371,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
                           setImpactTags(prev => [...prev, tag]);
                         }
                       }}
-                      className={`px-2 py-0.5 md:px-3 md:py-1.5 rounded-full text-[11px] md:text-sm font-medium transition-colors border cursor-pointer ${
+                      className={`px-2.5 py-1 md:px-3 md:py-1.5 rounded-full text-xs md:text-sm font-medium transition-colors border cursor-pointer ${
                         isSelected 
                           ? 'bg-blue-100 border-blue-500 text-blue-800' 
                           : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -391,26 +385,26 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
             </div>
 
             {(impactTags.includes('Persona atrapada') || impactTags.includes('Fallecimiento reportado')) && (
-              <div className="mt-2 md:mt-3 p-2 md:p-3 bg-red-50 border border-red-200 rounded-lg md:rounded-xl flex items-start gap-2 md:gap-3">
+              <div className="mt-2 md:mt-3 p-2.5 md:p-3 bg-red-50 border border-red-200 rounded-lg md:rounded-xl flex items-start gap-2 md:gap-3">
                 <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={15} />
-                <p className="text-[11px] md:text-sm text-red-700 font-medium">
+                <p className="text-xs md:text-sm text-red-700 font-medium">
                   Si hay personas en riesgo o una emergencia activa, contactá inmediatamente a los servicios de emergencia correspondientes.
                 </p>
               </div>
             )}
           </div>
 
-          <div className="space-y-1 md:space-y-3">
+          <div className="space-y-1.5 md:space-y-3">
             <label className="text-xs md:text-sm font-bold text-slate-700">Descripción del evento</label>
             <textarea 
               ref={descriptionRef}
               placeholder="Describa la situación de la inundación (ej: agua sobre la vereda, arroyo desbordado)..."
-              className="w-full text-xs md:text-sm p-2.5 md:p-4 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl h-16 md:h-28 resize-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white outline-none transition-all font-medium"
+              className="w-full text-xs md:text-sm p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl h-20 md:h-28 resize-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white outline-none transition-all font-medium"
             />
           </div>
 
           {/* Evidencia fotográfica */}
-          <div className="space-y-1 md:space-y-3">
+          <div className="space-y-1.5 md:space-y-3">
             <label className="text-xs md:text-sm font-bold text-slate-700">
               Evidencia fotográfica <span className="text-red-500">*</span>
             </label>
@@ -418,18 +412,18 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
             {!filePreviewUrl ? (
               <div 
                 onClick={() => setIsImagePickerOpen(true)}
-                className="relative border-2 border-dashed border-slate-300 rounded-xl md:rounded-2xl overflow-hidden bg-slate-50 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer group min-h-[75px] md:min-h-[150px] flex flex-col items-center justify-center py-2 md:py-3"
+                className="relative border-2 border-dashed border-slate-300 rounded-xl md:rounded-2xl overflow-hidden bg-slate-50 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer group min-h-[85px] md:min-h-[150px] flex flex-col items-center justify-center py-2.5 md:py-3"
               >
                 <div className="px-3 py-0.5 flex flex-col items-center justify-center text-slate-500">
-                  <div className="bg-white p-1.5 md:p-3 rounded-full shadow-sm mb-1 md:mb-3 group-hover:scale-110 transition-transform">
+                  <div className="bg-white p-2 md:p-3 rounded-full shadow-sm mb-1 md:mb-3 group-hover:scale-110 transition-transform">
                     <Camera size={18} className="text-slate-400 group-hover:text-blue-500 md:w-6 md:h-6" />
                   </div>
-                  <span className="text-[11px] md:text-sm text-center font-medium">Haga clic para adjuntar evidencia gráfica o tomar foto</span>
+                  <span className="text-xs md:text-sm text-center font-medium">Haga clic para adjuntar evidencia gráfica o tomar foto</span>
                 </div>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-xl md:rounded-2xl overflow-hidden bg-slate-50 p-2.5 md:p-4 space-y-2 md:space-y-4">
-                <div className="w-full h-32 md:h-48 relative rounded-lg md:rounded-xl overflow-hidden bg-slate-900 border border-slate-200 flex items-center justify-center">
+              <div className="border border-slate-200 rounded-xl md:rounded-2xl overflow-hidden bg-slate-50 p-3 md:p-4 space-y-3 md:space-y-4">
+                <div className="w-full h-36 md:h-48 relative rounded-lg md:rounded-xl overflow-hidden bg-slate-900 border border-slate-200 flex items-center justify-center">
                   <img 
                     src={filePreviewUrl} 
                     alt="Vista previa de la imagen" 
@@ -437,7 +431,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
                   />
                 </div>
                 
-                <div className="bg-white p-2.5 md:p-4 rounded-lg md:rounded-xl border border-slate-100 space-y-1 md:space-y-2 text-xs text-slate-600 shadow-sm">
+                <div className="bg-white p-3 md:p-4 rounded-lg md:rounded-xl border border-slate-100 space-y-1.5 md:space-y-2 text-xs text-slate-600 shadow-sm">
                   <div className="flex justify-between items-center gap-4">
                     <span className="font-bold text-slate-500 uppercase tracking-wide text-[10px]">Nombre</span>
                     <span className="text-slate-800 font-semibold truncate max-w-[220px]" title={imageFile?.name}>{imageFile?.name}</span>
@@ -454,18 +448,18 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
                   </div>
                 </div>
 
-                <div className="flex gap-2 justify-end pt-0.5">
+                <div className="flex gap-2.5 justify-end pt-1">
                   <button
                     type="button"
                     onClick={handleRemoveFile}
-                    className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 px-2.5 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-xs font-bold cursor-pointer transition-colors border border-red-100"
+                    className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-xs font-bold cursor-pointer transition-colors border border-red-100"
                   >
                     <Trash2 size={13} /> Eliminar
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsImagePickerOpen(true)}
-                    className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-xs font-bold cursor-pointer transition-colors border border-slate-200"
+                    className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl text-xs font-bold cursor-pointer transition-colors border border-slate-200"
                   >
                     Reemplazar
                   </button>
@@ -473,13 +467,13 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
               </div>
             )}
             {imageFile ? (
-              <p className="text-[10.5px] md:text-xs text-green-600 mt-0.5 font-bold flex items-center gap-1.5 select-none">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> 
+              <p className="text-[11px] md:text-xs text-green-600 mt-1 font-bold flex items-center gap-1.5 select-none">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> 
                 Imagen adjuntada correctamente.
               </p>
             ) : (
-              <p className="text-[10.5px] md:text-xs text-amber-600 mt-0.5 font-semibold flex items-center gap-1">
-                <AlertTriangle size={11} className="shrink-0 text-amber-500" />
+              <p className="text-[11px] md:text-xs text-amber-600 mt-0.5 font-semibold flex items-center gap-1">
+                <AlertTriangle size={12} className="shrink-0 text-amber-500" />
                 Evidencia fotográfica requerida para poder enviar el reporte.
               </p>
             )}
@@ -489,7 +483,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
             <button 
               type="submit"
               disabled={isSubmitting || !imageFile}
-              className={`w-full font-bold py-2.5 md:py-4 px-4 md:px-6 text-xs md:text-base rounded-xl transition-all transform flex items-center justify-center gap-2 ${
+              className={`w-full font-bold py-3 md:py-4 px-5 md:px-6 text-sm md:text-base rounded-xl transition-all transform flex items-center justify-center gap-2 ${
                 !imageFile
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-blue-700 hover:bg-blue-800 text-white shadow-[0_8px_20px_rgb(37,99,235,0.3)] hover:shadow-[0_8px_25px_rgb(37,99,235,0.4)] hover:-translate-y-0.5 active:translate-y-0 cursor-pointer'
@@ -497,7 +491,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="animate-spin" size={16} />
+                  <Loader2 className="animate-spin" size={18} />
                   Enviando reporte...
                 </>
               ) : 'Confirmar y Enviar Reporte'}
