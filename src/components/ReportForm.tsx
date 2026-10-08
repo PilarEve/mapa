@@ -285,27 +285,27 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1.5 sm:grid sm:grid-cols-2 sm:gap-2">
               <button 
                 type="button" 
                 onClick={handleGetLocation}
                 disabled={isLocating}
-                className="flex justify-center items-center gap-1.5 py-2 md:py-3 px-2 text-xs md:text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg md:rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-blue-100 cursor-pointer text-center"
+                className="w-full flex justify-center items-center gap-1.5 py-2.5 md:py-3 px-3 text-xs md:text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg md:rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-blue-100 cursor-pointer text-center"
               >
                 <MapPin size={15} className="shrink-0" /> 
-                <span className="truncate">{isLocating ? 'Obteniendo...' : 'Mi ubicación'}</span>
+                <span>{isLocating ? 'Obteniendo...' : 'Mi ubicación'}</span>
               </button>
 
               <button 
                 type="button"
                 onClick={() => setIsMapOpen(!isMapOpen)}
-                className={`flex justify-center items-center gap-1.5 py-2 md:py-3 px-2 text-xs md:text-sm font-bold border rounded-lg md:rounded-xl transition-all cursor-pointer text-center ${
+                className={`w-full flex justify-center items-center gap-1.5 py-1.5 sm:py-2 md:py-3 px-3 text-xs md:text-sm font-semibold border rounded-lg md:rounded-xl transition-all cursor-pointer text-center ${
                   isMapOpen 
                     ? 'bg-slate-100 border-slate-300 text-slate-700' 
                     : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
                 }`}
               >
-                <span className="truncate">Ubicar manualmente</span>
+                <span>Ubicar manualmente</span>
                 {isMapOpen ? <ChevronUp size={14} className="shrink-0" /> : <ChevronDown size={14} className="shrink-0" />}
               </button>
             </div>
