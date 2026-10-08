@@ -2,7 +2,7 @@
 
 import { Report } from '../types/report';
 import { format } from 'date-fns';
-import { MapPin, AlertTriangle, CheckCircle2, Clock, ChevronLeft, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, ChevronLeft, X } from 'lucide-react';
 
 interface SidebarReportsProps {
   reports: Report[];
@@ -36,8 +36,8 @@ export default function SidebarReports({ reports, onSelectReport, onCollapse }: 
 
       <div className="sidebar-scrollable flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
         {reports.map((report) => (
-          <div 
-            key={report.id} 
+          <div
+            key={report.id}
             onClick={() => onSelectReport(report)}
             className="group bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-xl hover:border-blue-200 cursor-pointer transition-all duration-300 transform hover:-translate-y-1"
           >
@@ -61,17 +61,14 @@ export default function SidebarReports({ reports, onSelectReport, onCollapse }: 
                 )}
               </div>
               <span className="text-xs flex items-center gap-1.5 text-slate-400 font-medium bg-slate-50 px-2 py-0.5 rounded-full shrink-0">
-                {report.status === 'validado' ? <CheckCircle2 size={14} className="text-green-500"/> : <Clock size={14}/>}
+                {report.status === 'validado' ? <CheckCircle2 size={14} className="text-green-500" /> : <Clock size={14} />}
                 <span className="capitalize">{report.status}</span>
               </span>
             </div>
-            
+
             <p className="text-sm text-slate-700 mb-4 line-clamp-2 leading-relaxed">{report.description}</p>
-            
-            <div className="flex justify-between items-center text-xs text-slate-400 border-t border-slate-50 pt-3">
-              <span className="flex items-center gap-1 font-medium group-hover:text-blue-600 transition-colors">
-                <MapPin size={14} /> Mburicaó
-              </span>
+
+            <div className="flex justify-end items-center text-xs text-slate-400 border-t border-slate-50 pt-3">
               <span className="font-medium">{format(new Date(report.dateTime), 'dd/MM HH:mm')}</span>
             </div>
           </div>
