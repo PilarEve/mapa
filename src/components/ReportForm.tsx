@@ -305,7 +305,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
                     : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
                 }`}
               >
-                <span className="truncate">Ubicar manual</span>
+                <span className="truncate">Ubicar manualmente</span>
                 {isMapOpen ? <ChevronUp size={14} className="shrink-0" /> : <ChevronDown size={14} className="shrink-0" />}
               </button>
             </div>
