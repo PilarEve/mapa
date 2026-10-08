@@ -516,14 +516,14 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
           onChange={handleFileChange}
         />
 
-        {/* Modal / Bottom Sheet para seleccionar origen de fotografía */}
+        {/* Modal para seleccionar origen de fotografía */}
         {isImagePickerOpen && (
           <div 
-            className="fixed inset-0 z-[3500] bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-4"
+            className="fixed inset-0 z-[3500] bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
             onClick={() => setIsImagePickerOpen(false)}
           >
             <div 
-              className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl animate-in slide-in-from-bottom-5 sm:zoom-in-95"
+              className="bg-white w-full max-w-xs sm:max-w-sm rounded-2xl p-5 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-center mb-4">
