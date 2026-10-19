@@ -148,7 +148,7 @@ export default function MapView() {
         }
 
         const { data: newsData, error: newsError } = await supabase
-          .from('noticias_historicas')
+          .from('dataset_principal')
           .select('*')
           .order('fecha_publicacion', { ascending: false });
 

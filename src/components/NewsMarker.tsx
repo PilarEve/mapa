@@ -33,8 +33,9 @@ interface NewsMarkerProps {
 export default function NewsMarker({ news }: NewsMarkerProps) {
   const icon = useMemo(() => NEWS_ICON, []);
   
-  const descripcionMostrar = news.descripcion?.trim() || news.titulo;
   const hasValue = (val: string | undefined | null) => Boolean(val && val.trim() !== "");
+  const hasTitle = hasValue(news.titulo);
+  const hasDescription = hasValue(news.descripcion) && news.descripcion?.trim() !== news.titulo?.trim();
 
   const formattedDate = useMemo(() => {
     if (!news.fecha_publicacion) return null;
@@ -50,22 +51,19 @@ export default function NewsMarker({ news }: NewsMarkerProps) {
       <Popup className="report-popup custom-news-popup">
         <div className="w-[260px] sm:w-[300px] max-w-[80vw] p-2.5 flex flex-col gap-2 font-sans">
           
-          {/* Header con insignias unificadas */}
-          <div className="flex justify-between items-center gap-2 border-b border-slate-100 pb-2">
+          {/* Header con insignia */}
+          <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
             <span className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full">
               Noticia Histórica
             </span>
-            {hasValue(news.gravedad) && (
-              <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize">
-                Gravedad: {news.gravedad}
-              </span>
-            )}
           </div>
 
           {/* Título de la Noticia */}
-          <h3 className="font-bold text-slate-900 text-sm leading-snug">
-            {news.titulo}
-          </h3>
+          {hasTitle && (
+            <h3 className="font-normal text-slate-700 text-xs leading-relaxed">
+              {news.titulo}
+            </h3>
+          )}
 
           {/* Imagen de la noticia */}
           {news.imagen_url && (
@@ -80,9 +78,11 @@ export default function NewsMarker({ news }: NewsMarkerProps) {
           )}
 
           {/* Descripción */}
-          <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal max-h-24 overflow-y-auto">
-            {descripcionMostrar}
-          </p>
+          {(hasDescription || (!hasTitle && hasValue(news.descripcion))) && (
+            <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal max-h-24 overflow-y-auto">
+              {news.descripcion}
+            </p>
+          )}
 
           {/* Pie de datos unificado */}
           <div className="pt-2 border-t border-slate-100 flex flex-col gap-1 text-[11px] text-slate-500 font-medium">

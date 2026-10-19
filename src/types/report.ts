@@ -25,4 +25,7 @@ export interface NoticiaHistorica {
   imagen_url?: string;
   url?: string;
   creado_en?: string;
+  evento_id?: number;
+  ciudad?: string;
+  barrio_zona?: string | null;
 }
