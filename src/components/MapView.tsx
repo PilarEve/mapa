@@ -147,17 +147,40 @@ export default function MapView() {
           setReports(mappedReports);
         }
 
-        const { data: newsData, error: newsError } = await supabase
-          .from('dataset_principal')
-          .select('*')
-          .order('fecha_publicacion', { ascending: false });
+        const [datasetRes, manualRes] = await Promise.all([
+          supabase
+            .from('dataset_principal')
+            .select('*')
+            .order('fecha_publicacion', { ascending: false }),
+          supabase
+            .from('noticias_historicas')
+            .select('*')
+            .order('fecha_publicacion', { ascending: false })
+        ]);
 
         if (!isMounted) return;
 
-        if (newsError) {
-          console.error('Error fetching news:', newsError.message);
-        } else if (newsData) {
-          const validNews = newsData
+        if (datasetRes.error) {
+          console.error('Error fetching dataset_principal:', datasetRes.error.message);
+        }
+        if (manualRes.error) {
+          console.error('Error fetching noticias_historicas:', manualRes.error.message);
+        }
+
+        const rawNews = [
+          ...(datasetRes.data || []),
+          ...(manualRes.data || [])
+        ];
+
+        if (rawNews.length > 0) {
+          const seenIds = new Set();
+          const uniqueNews = rawNews.filter(n => {
+            if (!n.id || seenIds.has(n.id)) return false;
+            seenIds.add(n.id);
+            return true;
+          });
+
+          const validNews = uniqueNews
             .filter(n => 
               n.latitud != null && 
               n.longitud != null && 
@@ -166,11 +189,26 @@ export default function MapView() {
               !isNaN(Number(n.latitud)) && 
               !isNaN(Number(n.longitud))
             )
-            .map(n => ({
-              ...n,
-              latitud: Number(n.latitud),
-              longitud: Number(n.longitud)
-            })) as NoticiaHistorica[];
+            .map(n => {
+              let lat = Number(n.latitud);
+              const lng = Number(n.longitud);
+              // Si la latitud en el área de Asunción/Paraguay se cargó positiva por error (+25 en vez de -25), normalizarla
+              if (lat > 18 && lat < 30) {
+                lat = -lat;
+              }
+              return {
+                ...n,
+                latitud: lat,
+                longitud: lng
+              };
+            }) as NoticiaHistorica[];
+
+          validNews.sort((a, b) => {
+            const dateA = a.fecha_publicacion ? new Date(a.fecha_publicacion).getTime() : 0;
+            const dateB = b.fecha_publicacion ? new Date(b.fecha_publicacion).getTime() : 0;
+            return dateB - dateA;
+          });
+
           setNews(validNews);
         }
       } catch (err) {
