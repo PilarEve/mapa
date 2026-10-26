@@ -42,3 +42,6 @@ next-env.d.ts
 
 # scratch previews
 scratch/preview-*/
+
+# local documentation
+/docs/
