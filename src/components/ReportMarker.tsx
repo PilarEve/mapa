@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Report } from '../types/report';
 import { format } from 'date-fns';
-import { Calendar, AlertCircle, CheckCircle2, Clock, XCircle, MapPin } from 'lucide-react';
+import { Calendar, AlertCircle, CheckCircle2, Clock, XCircle, Image as ImageIcon } from 'lucide-react';
 
 const createReportIcon = () => {
   const svgIcon = `
@@ -33,6 +33,11 @@ interface ReportMarkerProps {
 
 export default function ReportMarker({ report }: ReportMarkerProps) {
   const icon = useMemo(() => REPORT_ICON, []);
+  const [imageError, setImageError] = useState(false);
+
+  const isHeic = useMemo(() => {
+    return report.imageUrl ? /\.(heic|heif)(\?.*)?$/i.test(report.imageUrl) : false;
+  }, [report.imageUrl]);
   
   const hasDescription = useMemo(() => {
     return Boolean(report.description && report.description.trim() !== '' && report.description.trim().toLowerCase() !== 'sin descripción');
@@ -56,9 +61,9 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize">
+          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize" title="Información ciudadana pendiente de validación">
             <Clock size={12} className="shrink-0" />
-            Pendiente
+            Pendiente de validación
           </span>
         );
     }
@@ -85,12 +90,34 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
             {getStatusBadge(report.status)}
           </div>
 
-          {/* Imagen o Multimedia */}
+          {/* Aviso informativo de reporte ciudadano no verificado */}
+          {report.status === 'pendiente' && (
+            <div className="bg-amber-50 border border-amber-200/90 rounded-lg p-2 text-[10.5px] text-amber-800 leading-snug flex items-start gap-1.5">
+              <AlertCircle size={13} className="text-amber-600 shrink-0 mt-0.5" />
+              <span>Información ciudadana en proceso de verificación por el equipo de monitoreo.</span>
+            </div>
+          )}
+
+          {/* Imagen o Multimedia con soporte de fallback HEIC/HEIF sin alterar el original */}
           {report.imageUrl && (
             <div className="w-full h-40 sm:h-44 relative rounded-xl overflow-hidden shadow-sm border border-slate-100 bg-slate-900 flex items-center justify-center">
               {report.archivoTipo === 'video' ? (
                 <div className="w-full h-full flex items-center justify-center bg-slate-800 text-slate-400 text-xs font-medium px-4 text-center">
                   Evidencia en formato no soportado.
+                </div>
+              ) : isHeic || imageError ? (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800 text-slate-200 p-3 text-center">
+                  <ImageIcon size={26} className="text-blue-400 mb-1.5" />
+                  <span className="text-xs font-semibold text-white">Fotografía original {isHeic ? 'HEIC/HEIF' : ''}</span>
+                  <span className="text-[10px] text-slate-400 mt-0.5 mb-2">Preservada sin compresión ni alteraciones</span>
+                  <a 
+                    href={report.imageUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-blue-300 hover:text-white underline font-semibold"
+                  >
+                    Abrir archivo original
+                  </a>
                 </div>
               ) : (
                 <img 
@@ -98,6 +125,7 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
                   alt="Evidencia del reporte ciudadano" 
                   className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                   loading="lazy"
+                  onError={() => setImageError(true)}
                 />
               )}
             </div>

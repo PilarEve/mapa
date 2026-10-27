@@ -251,19 +251,8 @@ export default function FilterPanel({
                 className={`text-slate-400 transition-transform duration-200 ${expandedSections.estado ? 'rotate-180' : ''}`} 
               />
             </button>
-            <div className={`overflow-hidden transition-all duration-250 ease-in-out ${expandedSections.estado ? 'max-h-28 opacity-100 mt-1.5 pl-5' : 'max-h-0 opacity-0'}`}>
+            <div className={`overflow-hidden transition-all duration-250 ease-in-out ${expandedSections.estado ? 'max-h-20 opacity-100 mt-1.5 pl-5' : 'max-h-0 opacity-0'}`}>
               <div className="flex flex-col gap-2 pb-0.5">
-                <label className="flex items-center gap-2.5 cursor-pointer group w-fit">
-                  <input 
-                    type="checkbox" 
-                    checked={selectedStatuses.includes('pendiente')}
-                    onChange={() => handleStatusToggle('pendiente')}
-                    className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30 transition-shadow cursor-pointer"
-                  />
-                  <span className="text-xs text-slate-600 font-medium group-hover:text-slate-900 transition-colors">
-                    Pendientes
-                  </span>
-                </label>
                 <label className="flex items-center gap-2.5 cursor-pointer group w-fit">
                   <input 
                     type="checkbox" 
@@ -278,12 +267,12 @@ export default function FilterPanel({
                 <label className="flex items-center gap-2.5 cursor-pointer group w-fit">
                   <input 
                     type="checkbox" 
-                    checked={selectedStatuses.includes('rechazado')}
-                    onChange={() => handleStatusToggle('rechazado')}
+                    checked={selectedStatuses.includes('pendiente')}
+                    onChange={() => handleStatusToggle('pendiente')}
                     className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500/30 transition-shadow cursor-pointer"
                   />
                   <span className="text-xs text-slate-600 font-medium group-hover:text-slate-900 transition-colors">
-                    Descartados
+                    Pendientes
                   </span>
                 </label>
               </div>

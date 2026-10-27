@@ -60,9 +60,18 @@ export default function SidebarReports({ reports, onSelectReport, onCollapse }: 
                   </span>
                 )}
               </div>
-              <span className="text-xs flex items-center gap-1.5 text-slate-400 font-medium bg-slate-50 px-2 py-0.5 rounded-full shrink-0">
-                {report.status === 'validado' ? <CheckCircle2 size={14} className="text-green-500" /> : <Clock size={14} />}
-                <span className="capitalize">{report.status}</span>
+              <span className="text-xs shrink-0">
+                {report.status === 'validado' ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-full text-[11px]">
+                    <CheckCircle2 size={12} className="text-emerald-600" />
+                    Verificado
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-amber-700 font-semibold bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-full text-[11px]" title="Información ciudadana no verificada">
+                    <Clock size={12} className="text-amber-600" />
+                    Pendiente
+                  </span>
+                )}
               </span>
             </div>
 

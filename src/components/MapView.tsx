@@ -44,7 +44,7 @@ export default function MapView() {
   const [loading, setLoading] = useState(true);
   const [showReports, setShowReports] = useState<boolean>(true);
   const [showNews, setShowNews] = useState<boolean>(true);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['pendiente', 'validado', 'rechazado']);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['validado']);
   const [selectedDateRange, setSelectedDateRange] = useState<string>('todo');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isHeatmapVisible, setIsHeatmapVisible] = useState(false);
@@ -231,6 +231,9 @@ export default function MapView() {
   const filteredReports = useMemo(() => {
     if (!showReports) return [];
     return reports.filter(report => {
+      // Excluir reportes rechazados del mapa público, la lista lateral y el mapa de calor
+      if (report.status === 'rechazado') return false;
+
       const matchTags = selectedTags.length === 0 || 
         (report.impactTags && report.impactTags.some(tag => selectedTags.includes(tag)));
 

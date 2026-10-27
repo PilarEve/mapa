@@ -4,6 +4,55 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Report } from '../types/report';
 import { MapPin, Camera, Image as ImageIcon, X, Loader2, AlertTriangle, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import * as tus from 'tus-js-client';
+
+async function uploadWithTus(
+  file: File,
+  filePath: string,
+  onProgress?: (percentage: number) => void
+): Promise<void> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !anonKey) {
+    throw new Error('Configuración de Supabase no disponible en el cliente.');
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const upload = new tus.Upload(file, {
+      endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
+      retryDelays: [0, 1000, 3000, 5000],
+      headers: {
+        authorization: `Bearer ${anonKey}`,
+        apikey: anonKey,
+        'x-upsert': 'false',
+      },
+      uploadDataDuringCreation: true,
+      removeFingerprintOnSuccess: true,
+      metadata: {
+        bucketName: 'reportes',
+        objectName: filePath,
+        contentType: file.type || 'image/jpeg',
+        cacheControl: '3600',
+      },
+      chunkSize: 6 * 1024 * 1024,
+      onError: (err) => {
+        reject(err);
+      },
+      onProgress: (bytesUploaded, bytesTotal) => {
+        if (bytesTotal > 0 && onProgress) {
+          const pct = Math.round((bytesUploaded / bytesTotal) * 100);
+          onProgress(pct);
+        }
+      },
+      onSuccess: () => {
+        resolve();
+      },
+    });
+
+    upload.start();
+  });
+}
 
 
 const AVAILABLE_TAGS = [
@@ -77,11 +126,25 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
   const [impactTags, setImpactTags] = useState<string[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string>('');
+  const [previewError, setPreviewError] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAfectacionesOpen, setIsAfectacionesOpen] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
+  const [honeypot, setHoneypot] = useState('');
+  const formOpenedAtRef = useRef<number | null>(null);
+
+  const isHeicPreview = useMemo(() => {
+    if (!imageFile) return false;
+    const rawExt = (imageFile.name.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return rawExt === 'heic' || rawExt === 'heif' || imageFile.type.includes('heic') || imageFile.type.includes('heif');
+  }, [imageFile]);
+
+  useEffect(() => {
+    formOpenedAtRef.current = Date.now();
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -114,18 +177,23 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
   };
 
   const validateFile = (file: File): { valid: boolean; error?: string } => {
-    if (!file.type.startsWith('image/')) {
+    const rawExt = (file.name.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'];
+    const isImageMime = file.type.startsWith('image/');
+
+    if (!allowedExts.includes(rawExt) && !isImageMime) {
       return {
         valid: false,
-        error: "Tipo de archivo no permitido. Solo se aceptan imágenes."
+        error: "Tipo de archivo no permitido. Solo se aceptan fotografías (JPG, PNG, WEBP, HEIC, HEIF)."
       };
     }
 
-    const maxSize = 10 * 1024 * 1024;
+    // Límite técnico efectivo de infraestructura Supabase (50 MB)
+    const maxSize = 50 * 1024 * 1024;
     if (file.size > maxSize) {
       return {
         valid: false,
-        error: "La imagen supera el tamaño máximo permitido (10 MB)."
+        error: "La fotografía supera el límite técnico de almacenamiento permitido (50 MB)."
       };
     }
 
@@ -147,6 +215,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
         URL.revokeObjectURL(filePreviewUrl);
       }
 
+      setPreviewError(false);
       setImageFile(file);
       setFilePreviewUrl(URL.createObjectURL(file));
       setIsImagePickerOpen(false);
@@ -159,6 +228,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
     }
     setImageFile(null);
     setFilePreviewUrl('');
+    setPreviewError(false);
 
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (galleryInputRef.current) galleryInputRef.current.value = '';
@@ -168,8 +238,35 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
     e.preventDefault();
     if (isSubmitting) return;
 
+    // 1. Detección de bots automatizados por campo trampa (honeypot)
+    if (honeypot.trim() !== '') {
+      console.warn('Envío descartado por detección de bot (honeypot).');
+      onClose();
+      return;
+    }
+
+    // 2. Control de tiempo mínimo de llenado (evita ráfagas automáticas)
+    if (formOpenedAtRef.current && Date.now() - formOpenedAtRef.current < 1500) {
+      alert("Por favor, revise los datos del reporte antes de enviarlo.");
+      return;
+    }
+
     if (!lat || !lng) {
       alert("Seleccioná una ubicación en el mapa antes de enviar el reporte.");
+      return;
+    }
+
+    const parsedLat = parseFloat(lat);
+    const parsedLng = parseFloat(lng);
+    if (
+      isNaN(parsedLat) || 
+      isNaN(parsedLng) || 
+      parsedLat < -90 || 
+      parsedLat > 90 || 
+      parsedLng < -180 || 
+      parsedLng > 180
+    ) {
+      alert("Las coordenadas de ubicación no son válidas.");
       return;
     }
 
@@ -179,26 +276,52 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
     }
 
     setIsSubmitting(true);
+    setUploadProgress(null);
     let finalImageUrl = null;
     let archivoTipo: 'imagen' | null = null;
+    let uploadedFilePath: string | null = null;
 
     try {
       if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop() || '';
+        const rawExt = (imageFile.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'];
+        const fileExt = allowedExts.includes(rawExt) ? rawExt : 'jpg';
+
         archivoTipo = 'imagen';
 
         const fileName = `${crypto.randomUUID()}.${fileExt}`;
         const filePath = `imagenes/${fileName}`;
+        uploadedFilePath = filePath;
 
-        const { error: uploadError } = await supabase.storage
-          .from('reportes')
-          .upload(filePath, imageFile, {
-            contentType: imageFile.type,
-            upsert: false
-          });
+        // Si el archivo es grande (>= 6 MB), usar subida reanudable TUS con seguimiento de progreso
+        if (imageFile.size >= 6 * 1024 * 1024) {
+          try {
+            await uploadWithTus(imageFile, filePath, (percent) => setUploadProgress(percent));
+          } catch (tusError) {
+            console.warn('Carga TUS no completada, intentando con carga estándar...', tusError);
+            setUploadProgress(null);
+            const { error: uploadError } = await supabase.storage
+              .from('reportes')
+              .upload(filePath, imageFile, {
+                contentType: imageFile.type || 'image/jpeg',
+                upsert: false
+              });
 
-        if (uploadError) {
-          throw new Error(`Error al subir la imagen: ${uploadError.message}`);
+            if (uploadError) {
+              throw new Error(`Error al subir la imagen: ${uploadError.message}`);
+            }
+          }
+        } else {
+          const { error: uploadError } = await supabase.storage
+            .from('reportes')
+            .upload(filePath, imageFile, {
+              contentType: imageFile.type || 'image/jpeg',
+              upsert: false
+            });
+
+          if (uploadError) {
+            throw new Error(`Error al subir la imagen: ${uploadError.message}`);
+          }
         }
 
         const { data: { publicUrl } } = supabase.storage
@@ -208,21 +331,29 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
         finalImageUrl = publicUrl;
       }
 
+      const rawDescription = descriptionRef.current?.value?.trim() || null;
+      const sanitizedDescription = rawDescription ? rawDescription.slice(0, 500) : null;
+      const validImpactTags = impactTags.filter(tag => AVAILABLE_TAGS.includes(tag)).slice(0, 11);
+
       const { data, error: insertError } = await supabase
         .from("reportes")
         .insert({
-          descripcion: descriptionRef.current?.value || null,
-          latitud: parseFloat(lat),
-          longitud: parseFloat(lng),
+          descripcion: sanitizedDescription,
+          latitud: parsedLat,
+          longitud: parsedLng,
           imagen_url: finalImageUrl ?? null,
           archivo_tipo: archivoTipo ?? null,
           estado: "pendiente",
-          afectaciones: impactTags,
+          afectaciones: validImpactTags,
         })
         .select()
         .single();
 
       if (insertError) {
+        // Rollback: eliminar imagen huérfana si falló el guardado en base de datos
+        if (uploadedFilePath) {
+          await supabase.storage.from('reportes').remove([uploadedFilePath]).catch(() => {});
+        }
         throw new Error(`Error al guardar el reporte: ${insertError.message}`);
       }
 
@@ -249,11 +380,17 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
 
       onSubmit(mappedNewReport);
     } catch (error: unknown) {
+      // Rollback de imagen subida en caso de error imprevisto
+      if (uploadedFilePath) {
+        await supabase.storage.from('reportes').remove([uploadedFilePath]).catch(() => {});
+      }
       console.error('Error al enviar el reporte:', error);
       const msg = error instanceof Error ? error.message : 'Ocurrió un error al enviar el reporte. Por favor, intentá nuevamente.';
       alert(msg);
+      // Los datos ingresados y la imagen se conservan intactos en el formulario para reintentar
     } finally {
       setIsSubmitting(false);
+      setUploadProgress(null);
     }
   };
 
@@ -274,6 +411,20 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
         </div>
         
         <form onSubmit={handleSubmit} className="form-scrollable p-3 sm:p-4 md:p-6 space-y-3 md:space-y-5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 flex-1">
+          {/* Honeypot invisible para descarte silencioso de bots */}
+          <div className="sr-only" aria-hidden="true" style={{ display: 'none' }}>
+            <label htmlFor="hp_extra_field">No completar</label>
+            <input
+              id="hp_extra_field"
+              type="text"
+              name="hp_extra_field"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+              tabIndex={-1}
+              autoComplete="off"
+            />
+          </div>
+
           <div className="space-y-2 md:space-y-3 border border-slate-100 rounded-xl md:rounded-2xl p-3 md:p-4 bg-slate-50/30">
             <div className="flex justify-between items-center select-none">
               <label className="text-xs md:text-sm font-bold text-slate-700">Ubicación <span className="text-red-500">*</span></label>
@@ -395,9 +546,13 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
           </div>
 
           <div className="space-y-1.5 md:space-y-3">
-            <label className="text-xs md:text-sm font-bold text-slate-700">Descripción del evento</label>
+            <div className="flex justify-between items-center">
+              <label className="text-xs md:text-sm font-bold text-slate-700">Descripción del evento</label>
+              <span className="text-[10px] text-slate-400 font-medium">Máx. 500 caracteres</span>
+            </div>
             <textarea 
               ref={descriptionRef}
+              maxLength={500}
               placeholder="Describa la situación de la inundación (ej: agua sobre la vereda, arroyo desbordado)..."
               className="w-full text-xs md:text-sm p-3 md:p-4 bg-slate-50 border border-slate-200 rounded-lg md:rounded-xl h-20 md:h-28 resize-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white outline-none transition-all font-medium"
             />
@@ -424,11 +579,22 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
             ) : (
               <div className="border border-slate-200 rounded-xl md:rounded-2xl overflow-hidden bg-slate-50 p-3 md:p-4 space-y-3 md:space-y-4">
                 <div className="w-full h-36 md:h-48 relative rounded-lg md:rounded-xl overflow-hidden bg-slate-900 border border-slate-200 flex items-center justify-center">
-                  <img 
-                    src={filePreviewUrl} 
-                    alt="Vista previa de la imagen" 
-                    className="max-h-full max-w-full object-contain"
-                  />
+                  {isHeicPreview || previewError ? (
+                    <div className="p-4 text-center text-slate-300 flex flex-col items-center justify-center">
+                      <ImageIcon size={32} className="text-blue-400 mb-2" />
+                      <span className="text-xs font-bold text-white">Fotografía {isHeicPreview ? 'HEIC/HEIF' : ''} adjuntada</span>
+                      <p className="text-[11px] text-slate-400 mt-1 max-w-xs">
+                        Este navegador no permite vista previa directa de imágenes en este formato, pero el archivo original se enviará completo en máxima resolución y conservando sus metadatos EXIF.
+                      </p>
+                    </div>
+                  ) : (
+                    <img 
+                      src={filePreviewUrl} 
+                      alt="Vista previa de la imagen" 
+                      className="max-h-full max-w-full object-contain"
+                      onError={() => setPreviewError(true)}
+                    />
+                  )}
                 </div>
                 
                 <div className="bg-white p-3 md:p-4 rounded-lg md:rounded-xl border border-slate-100 space-y-1.5 md:space-y-2 text-xs text-slate-600 shadow-sm">
@@ -443,7 +609,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-slate-500 uppercase tracking-wide text-[10px]">Tipo</span>
                     <span className="text-slate-800 font-semibold capitalize flex items-center gap-1">
-                      <Camera size={14} className="text-blue-500" /> Imagen ({imageFile?.type.split('/').pop()})
+                      <Camera size={14} className="text-blue-500" /> Imagen ({imageFile?.type.split('/').pop() || imageFile?.name.split('.').pop()})
                     </span>
                   </div>
                 </div>
@@ -483,17 +649,31 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
             <button 
               type="submit"
               disabled={isSubmitting || !imageFile}
-              className={`w-full font-bold py-3 md:py-4 px-5 md:px-6 text-sm md:text-base rounded-xl transition-all transform flex items-center justify-center gap-2 ${
+              className={`w-full font-bold py-3 md:py-4 px-5 md:px-6 text-sm md:text-base rounded-xl transition-all transform flex flex-col items-center justify-center gap-1.5 ${
                 !imageFile
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                   : 'bg-blue-700 hover:bg-blue-800 text-white shadow-[0_8px_20px_rgb(37,99,235,0.3)] hover:shadow-[0_8px_25px_rgb(37,99,235,0.4)] hover:-translate-y-0.5 active:translate-y-0 cursor-pointer'
               }`}
             >
               {isSubmitting ? (
-                <>
-                  <Loader2 className="animate-spin" size={18} />
-                  Enviando reporte...
-                </>
+                <div className="flex flex-col items-center gap-1.5 w-full">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="animate-spin" size={18} />
+                    <span>
+                      {uploadProgress !== null 
+                        ? `Subiendo fotografía (${uploadProgress}%)...` 
+                        : 'Enviando reporte...'}
+                    </span>
+                  </div>
+                  {uploadProgress !== null && (
+                    <div className="w-full max-w-xs bg-blue-900/40 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className="bg-white h-full transition-all duration-150 ease-out" 
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
               ) : 'Confirmar y Enviar Reporte'}
             </button>
           </div>
@@ -503,7 +683,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
         <input 
           ref={cameraInputRef}
           type="file" 
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif,image/*"
           capture="environment"
           className="hidden" 
           onChange={handleFileChange}
@@ -511,7 +691,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
         <input 
           ref={galleryInputRef}
           type="file" 
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif,image/*"
           className="hidden" 
           onChange={handleFileChange}
         />
