@@ -50,7 +50,14 @@ async function uploadWithTus(
       },
     });
 
-    upload.start();
+    upload.findPreviousUploads().then((previousUploads) => {
+      if (previousUploads.length) {
+        upload.resumeFromPreviousUpload(previousUploads[0]);
+      }
+      upload.start();
+    }).catch(() => {
+      upload.start();
+    });
   });
 }
 
@@ -178,13 +185,13 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
 
   const validateFile = (file: File): { valid: boolean; error?: string } => {
     const rawExt = (file.name.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'];
+    const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'avif'];
     const isImageMime = file.type.startsWith('image/');
 
     if (!allowedExts.includes(rawExt) && !isImageMime) {
       return {
         valid: false,
-        error: "Tipo de archivo no permitido. Solo se aceptan fotografías (JPG, PNG, WEBP, HEIC, HEIF)."
+        error: "Tipo de archivo no permitido. Solo se aceptan fotografías (JPG, PNG, WEBP, HEIC, HEIF, AVIF)."
       };
     }
 
@@ -284,7 +291,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
     try {
       if (imageFile) {
         const rawExt = (imageFile.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'];
+        const allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'avif'];
         const fileExt = allowedExts.includes(rawExt) ? rawExt : 'jpg';
 
         archivoTipo = 'imagen';
@@ -683,7 +690,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
         <input 
           ref={cameraInputRef}
           type="file" 
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif,image/*"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,.jpg,.jpeg,.png,.webp,.heic,.heif,.avif,image/*"
           capture="environment"
           className="hidden" 
           onChange={handleFileChange}
@@ -691,7 +698,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
         <input 
           ref={galleryInputRef}
           type="file" 
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif,image/*"
+          accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,.jpg,.jpeg,.png,.webp,.heic,.heif,.avif,image/*"
           className="hidden" 
           onChange={handleFileChange}
         />

@@ -2,7 +2,7 @@
 
 import { Report } from '../types/report';
 import { format } from 'date-fns';
-import { AlertTriangle, CheckCircle2, Clock, ChevronLeft, X } from 'lucide-react';
+import { AlertTriangle, AlertCircle, CheckCircle2, Clock, ChevronLeft, X } from 'lucide-react';
 
 interface SidebarReportsProps {
   reports: Report[];
@@ -39,10 +39,14 @@ export default function SidebarReports({ reports, onSelectReport, onCollapse }: 
           <div
             key={report.id}
             onClick={() => onSelectReport(report)}
-            className="group bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-xl hover:border-blue-200 cursor-pointer transition-all duration-300 transform hover:-translate-y-1"
+            className={`group bg-white p-4 rounded-xl border shadow-sm hover:shadow-xl cursor-pointer transition-all duration-300 transform hover:-translate-y-1 ${
+              report.status === 'pendiente' 
+                ? 'border-amber-200/80 hover:border-amber-300 bg-gradient-to-b from-amber-50/20 to-white' 
+                : 'border-slate-100 hover:border-blue-200'
+            }`}
           >
             <div className="flex justify-between items-start mb-3">
-              <div className="flex flex-wrap gap-1 max-w-[70%]">
+              <div className="flex flex-wrap gap-1 max-w-[65%]">
                 {report.impactTags && report.impactTags.length > 0 ? (
                   report.impactTags.slice(0, 2).map(tag => (
                     <span key={tag} className="bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider truncate">
@@ -67,13 +71,20 @@ export default function SidebarReports({ reports, onSelectReport, onCollapse }: 
                     Verificado
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-amber-700 font-semibold bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-full text-[11px]" title="Información ciudadana no verificada">
+                  <span className="inline-flex items-center gap-1 text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full text-[10.5px]" title="Reporte pendiente de validación">
                     <Clock size={12} className="text-amber-600" />
                     Pendiente
                   </span>
                 )}
               </span>
             </div>
+
+            {report.status === 'pendiente' && (
+              <div className="mb-2.5 bg-amber-50 border border-amber-200/70 rounded-lg px-2.5 py-1 flex items-center gap-1.5 text-[10.5px] text-amber-800 font-medium">
+                <AlertCircle size={12} className="text-amber-600 shrink-0" />
+                <span>Pendiente de validación</span>
+              </div>
+            )}
 
             <p className="text-sm text-slate-700 mb-4 line-clamp-2 leading-relaxed">{report.description}</p>
 

@@ -7,32 +7,41 @@ import { Report } from '../types/report';
 import { format } from 'date-fns';
 import { Calendar, AlertCircle, CheckCircle2, Clock, XCircle, Image as ImageIcon } from 'lucide-react';
 
-const createReportIcon = () => {
+const createReportIcon = (isPending: boolean) => {
+  const fillColor = isPending ? '#d97706' : '#2563eb';
+  const innerDot = isPending
+    ? `<circle cx="12" cy="10" r="3" fill="#fef3c7" stroke="#b45309" stroke-width="1"></circle>`
+    : `<circle cx="12" cy="10" r="3" fill="#ffffff"></circle>`;
+
   const svgIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#2563eb" width="24" height="24" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-      <circle cx="12" cy="10" r="3" fill="#ffffff"></circle>
-    </svg>
+    <div style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25)); display: flex; align-items: center; justify-content: center;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${fillColor}" width="26" height="26" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+        ${innerDot}
+      </svg>
+    </div>
   `;
 
   return L.divIcon({
     className: 'custom-leaflet-icon bg-transparent border-0',
     html: svgIcon,
-    iconSize: [24, 24],
-    iconAnchor: [12, 24],
-    popupAnchor: [0, -24],
+    iconSize: [26, 26],
+    iconAnchor: [13, 26],
+    popupAnchor: [0, -26],
   });
 };
 
-// Instancia estática de icono para evitar recrearlo en cada renderizado
-const REPORT_ICON = createReportIcon();
+// Instancias estáticas de icono para evitar recrearlas en cada renderizado
+const VERIFIED_ICON = createReportIcon(false);
+const PENDING_ICON = createReportIcon(true);
 
 interface ReportMarkerProps {
   report: Report;
 }
 
 export default function ReportMarker({ report }: ReportMarkerProps) {
-  const icon = useMemo(() => REPORT_ICON, []);
+  const isPending = report.status === 'pendiente';
+  const icon = useMemo(() => (isPending ? PENDING_ICON : VERIFIED_ICON), [isPending]);
   const [imageError, setImageError] = useState(false);
 
   const isHeic = useMemo(() => {
@@ -61,9 +70,9 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize" title="Información ciudadana pendiente de validación">
+          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize" title="Reporte pendiente de validación">
             <Clock size={12} className="shrink-0" />
-            Pendiente de validación
+            Pendiente
           </span>
         );
     }
@@ -84,17 +93,17 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
           
           {/* Header con insignias unificadas */}
           <div className="flex justify-between items-center gap-2 border-b border-slate-100 pb-2">
-            <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+            <span className="bg-slate-100 text-slate-600 border border-slate-200/80 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md">
               Reporte Ciudadano
             </span>
             {getStatusBadge(report.status)}
           </div>
 
-          {/* Aviso informativo de reporte ciudadano no verificado */}
-          {report.status === 'pendiente' && (
-            <div className="bg-amber-50 border border-amber-200/90 rounded-lg p-2 text-[10.5px] text-amber-800 leading-snug flex items-start gap-1.5">
-              <AlertCircle size={13} className="text-amber-600 shrink-0 mt-0.5" />
-              <span>Información ciudadana en proceso de verificación por el equipo de monitoreo.</span>
+          {/* Aviso breve y liviano de reporte pendiente */}
+          {isPending && (
+            <div className="bg-amber-50/70 border border-amber-200/60 rounded-lg px-2.5 py-1.5 text-[11px] text-amber-800 flex items-center gap-1.5 font-medium">
+              <AlertCircle size={13} className="text-amber-600 shrink-0" />
+              <span>Reporte pendiente de validación.</span>
             </div>
           )}
 

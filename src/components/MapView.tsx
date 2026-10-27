@@ -125,6 +125,7 @@ export default function MapView() {
         const { data, error } = await supabase
           .from('reportes')
           .select('*')
+          .neq('estado', 'rechazado')
           .order('creado_en', { ascending: false });
 
         if (!isMounted) return;
@@ -293,6 +294,8 @@ export default function MapView() {
 
   const handleAddReport = (newReport: Report) => {
     setReports(prev => [newReport, ...prev]);
+    // Asegurar que el reporte recién enviado sea visible para el usuario activando la vista de pendientes
+    setSelectedStatuses(prev => prev.includes('pendiente') ? prev : [...prev, 'pendiente']);
     setShowReportForm(false);
     if (mapRef) mapRef.setView([newReport.lat, newReport.lng], 15);
   };
