@@ -47,7 +47,7 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
   const isHeic = useMemo(() => {
     return report.imageUrl ? /\.(heic|heif)(\?.*)?$/i.test(report.imageUrl) : false;
   }, [report.imageUrl]);
-  
+
   const hasDescription = useMemo(() => {
     return Boolean(report.description && report.description.trim() !== '' && report.description.trim().toLowerCase() !== 'sin descripción');
   }, [report.description]);
@@ -90,7 +90,7 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
     <Marker position={[report.lat, report.lng]} icon={icon}>
       <Popup className="report-popup custom-report-popup">
         <div className="w-[260px] sm:w-[300px] max-w-[80vw] p-2.5 flex flex-col gap-2 font-sans">
-          
+
           {/* Header con insignias unificadas */}
           <div className="flex justify-between items-center gap-2 border-b border-slate-100 pb-2">
             <span className="bg-slate-100 text-slate-600 border border-slate-200/80 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md">
@@ -119,9 +119,9 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
                   <ImageIcon size={26} className="text-blue-400 mb-1.5" />
                   <span className="text-xs font-semibold text-white">Fotografía original {isHeic ? 'HEIC/HEIF' : ''}</span>
                   <span className="text-[10px] text-slate-400 mt-0.5 mb-2">Preservada sin compresión ni alteraciones</span>
-                  <a 
-                    href={report.imageUrl} 
-                    target="_blank" 
+                  <a
+                    href={report.imageUrl}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-[11px] text-blue-300 hover:text-white underline font-semibold"
                   >
@@ -129,9 +129,9 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
                   </a>
                 </div>
               ) : (
-                <img 
-                  src={report.imageUrl} 
-                  alt="Evidencia del reporte ciudadano" 
+                <img
+                  src={report.imageUrl}
+                  alt="Evidencia del reporte ciudadano"
                   className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                   loading="lazy"
                   onError={() => setImageError(true)}
