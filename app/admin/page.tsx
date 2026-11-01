@@ -1,6 +1,7 @@
 import { LogOut, MapPin, Calendar } from 'lucide-react';
 import { requireAdmin } from '@/lib/admin/auth';
 import { logout } from './actions';
+import ReportActions from './ReportActions';
 
 export const metadata = {
   title: 'Panel administrativo - Venus',
@@ -22,6 +23,8 @@ interface ReporteRow {
   estado: string | null;
   afectaciones: string[] | null;
   creado_en: string | null;
+  imagen_privada_path: string | null;
+  imagen_publica_retirada: boolean | null;
 }
 
 const ESTADOS: { key: Estado | 'todos'; label: string }[] = [
@@ -55,15 +58,31 @@ export default async function AdminPage({
   const { estado } = await searchParams;
   const filtro = ESTADOS.find((e) => e.key === estado)?.key ?? 'todos';
 
-  let query = supabase
-    .from('reportes')
-    .select('id, descripcion, latitud, longitud, imagen_url, archivo_tipo, estado, afectaciones, creado_en')
-    .order('creado_en', { ascending: false })
-    .limit(200);
-  if (filtro !== 'todos') query = query.eq('estado', filtro);
+  const BASE_COLS = 'id, descripcion, latitud, longitud, imagen_url, archivo_tipo, estado, afectaciones, creado_en';
+  const runQuery = (cols: string) => {
+    let q = supabase.from('reportes').select(cols).order('creado_en', { ascending: false }).limit(200);
+    if (filtro !== 'todos') q = q.eq('estado', filtro);
+    return q;
+  };
 
-  const { data, error } = await query;
-  const reportes = (data ?? []) as ReporteRow[];
+  let { data, error } = await runQuery(`${BASE_COLS}, imagen_privada_path, imagen_publica_retirada`);
+  if (error) {
+    // Columnas de Etapa 4 aún no creadas en Supabase: modo de solo lectura
+    ({ data, error } = await runQuery(BASE_COLS));
+  }
+  const reportes = ((data ?? []) as unknown) as ReporteRow[];
+
+  // Fotos de rechazados: URL firmada temporal desde el bucket privado (nunca la URL pública)
+  const privPaths = reportes.map((r) => r.imagen_privada_path).filter((p): p is string => !!p);
+  const signed = new Map<string, string>();
+  if (privPaths.length > 0) {
+    const { data: urls } = await supabase.storage.from('reportes-privados').createSignedUrls(privPaths, 600);
+    urls?.forEach((u) => {
+      if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+    });
+  }
+  const approveEnabled = process.env.ADMIN_APROBACION_HABILITADA === 'true';
+  const rejectEnabled = process.env.ADMIN_RECHAZO_HABILITADO === 'true';
 
   return (
     <main className="flex-1 overflow-y-auto">
@@ -113,14 +132,19 @@ export default async function AdminPage({
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {reportes.map((r) => {
             const est = (r.estado ?? 'pendiente') as Estado;
+            // Rechazados: nunca usar la URL pública; solo la firmada del bucket privado
+            const mediaUrl =
+              est === 'rechazado'
+                ? (r.imagen_privada_path ? signed.get(r.imagen_privada_path) ?? null : null)
+                : r.imagen_url;
             return (
               <li key={r.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm flex flex-col">
                 <div className="aspect-video bg-slate-100">
-                  {r.imagen_url && r.archivo_tipo !== 'video' ? (
+                  {mediaUrl && r.archivo_tipo !== 'video' ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={r.imagen_url} alt="Fotografía del reporte" loading="lazy" className="w-full h-full object-cover" />
-                  ) : r.imagen_url ? (
-                    <video src={r.imagen_url} controls preload="metadata" className="w-full h-full object-cover" />
+                    <img src={mediaUrl} alt="Fotografía del reporte" loading="lazy" className="w-full h-full object-cover" />
+                  ) : mediaUrl ? (
+                    <video src={mediaUrl} controls preload="metadata" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">Sin fotografía</div>
                   )}
@@ -153,6 +177,13 @@ export default async function AdminPage({
                     </p>
                     <p className="flex items-center gap-1.5"><Calendar size={13} /> {formatDate(r.creado_en)}</p>
                   </div>
+                  <ReportActions
+                    id={String(r.id)}
+                    estado={est}
+                    needsPublicRetire={est === 'rechazado' && !!r.imagen_privada_path && !r.imagen_publica_retirada}
+                    approveEnabled={approveEnabled}
+                    rejectEnabled={rejectEnabled}
+                  />
                 </div>
               </li>
             );
