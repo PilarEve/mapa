@@ -2,6 +2,7 @@ import { LogOut, MapPin, Calendar } from 'lucide-react';
 import { requireAdmin } from '@/lib/admin/auth';
 import { logout } from './actions';
 import ReportActions from './ReportActions';
+import AdminNav from './AdminNav';
 
 export const metadata = {
   title: 'Panel administrativo - Venus',
@@ -101,6 +102,8 @@ export default async function AdminPage({
             </button>
           </form>
         </header>
+
+        <AdminNav activa="reportes" />
 
         <nav className="flex flex-wrap gap-2" aria-label="Filtrar por estado">
           {ESTADOS.map((e) => (
