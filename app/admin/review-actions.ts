@@ -184,7 +184,41 @@ export async function rechazarReporte(id: string): Promise<ActionResult> {
       };
 }
 
-type RetireStage = 'ok' | 'remove_error' | 'remove_sin_efecto' | 'aun_existe' | 'marcar_error' | 'marcar_false';
+type ObjectState = 'existe' | 'inexistente' | 'permiso' | 'conexion';
+
+/**
+ * Existencia del objeto consultada a la base de Storage (API list, autenticada con la
+ * sesión del administrador): NO usa la URL pública ni el CDN, así que no hay caché.
+ * Distingue: existe / inexistente / error de permisos / error de conexión u otro.
+ */
+async function objectState(supabase: SupabaseClient, bucket: string, path: string): Promise<ObjectState> {
+  const slash = path.lastIndexOf('/');
+  const folder = slash >= 0 ? path.slice(0, slash) : '';
+  const name = path.slice(slash + 1);
+  try {
+    const { data, error } = await supabase.storage.from(bucket).list(folder, { search: name, limit: 100 });
+    if (error) {
+      const status = Number((error as { status?: number; statusCode?: number | string }).status ??
+        (error as { statusCode?: number | string }).statusCode);
+      console.error('[admin/retiro] list error', { bucket, path, status, message: error.message });
+      return status === 401 || status === 403 ? 'permiso' : 'conexion';
+    }
+    return (data ?? []).some((o) => o.name === name) ? 'existe' : 'inexistente';
+  } catch (e) {
+    console.error('[admin/retiro] list excepción', { bucket, path, message: e instanceof Error ? e.message : String(e) });
+    return 'conexion';
+  }
+}
+
+type RetireStage =
+  | 'ok'
+  | 'remove_error'
+  | 'remove_sin_efecto'
+  | 'aun_existe'
+  | 'verificacion_permiso'
+  | 'verificacion_conexion'
+  | 'marcar_error'
+  | 'marcar_false';
 
 /**
  * Retira la copia pública de forma idempotente y con diagnóstico por etapa
@@ -200,10 +234,12 @@ async function retirePublicCopy(
     console.info('[admin/retiro]', { reporteId: id, publicPath, stage, ...extra });
 
   // 0. ¿El objeto público todavía existe? (un intento previo pudo borrarlo y fallar después)
-  const before = await download(supabase, PUBLIC_BUCKET, publicPath);
-  log('existe_antes', { existe: !!before });
+  const before = await objectState(supabase, PUBLIC_BUCKET, publicPath);
+  log('estado_antes', { estado: before });
+  if (before === 'permiso') return { ok: false, stage: 'verificacion_permiso' };
+  if (before === 'conexion') return { ok: false, stage: 'verificacion_conexion' };
 
-  if (before) {
+  if (before === 'existe') {
     // 1. Borrado: lo autoriza la política vía private.puede_retirar_imagen_publica(name).
     //    Sin permiso, remove() devuelve lista vacía sin error.
     const rm = await supabase.storage.from(PUBLIC_BUCKET).remove([publicPath]);
@@ -214,10 +250,12 @@ async function retirePublicCopy(
     if (rm.error) return { ok: false, stage: 'remove_error' };
     if (!rm.data || rm.data.length === 0) return { ok: false, stage: 'remove_sin_efecto' };
 
-    // 2. Verificar que ya no existe
-    const after = await download(supabase, PUBLIC_BUCKET, publicPath);
-    log('existe_despues', { existe: !!after });
-    if (after) return { ok: false, stage: 'aun_existe' };
+    // 2. Verificar en la base de Storage (no por URL/CDN) que ya no existe
+    const after = await objectState(supabase, PUBLIC_BUCKET, publicPath);
+    log('estado_despues', { estado: after });
+    if (after === 'permiso') return { ok: false, stage: 'verificacion_permiso' };
+    if (after === 'conexion') return { ok: false, stage: 'verificacion_conexion' };
+    if (after === 'existe') return { ok: false, stage: 'aun_existe' };
   }
 
   // 3. Registrar el retiro (la función SQL vuelve a comprobar que el objeto ya no está)
@@ -236,7 +274,9 @@ const STAGE_MESSAGE: Record<RetireStage, string> = {
   remove_error: 'Storage devolvió un error al borrar.',
   remove_sin_efecto:
     'Storage no borró nada: la política de borrado no autorizó la operación (revisar private.puede_retirar_imagen_publica).',
-  aun_existe: 'El borrado se ejecutó pero el archivo público sigue accesible.',
+  aun_existe: 'El borrado se ejecutó pero el objeto sigue existiendo en Storage.',
+  verificacion_permiso: 'No se pudo verificar el objeto público: error de permisos.',
+  verificacion_conexion: 'No se pudo verificar el objeto público: error de conexión con Storage. Reintentá.',
   marcar_error: 'Se borró la copia pública, pero falló el registro del retiro.',
   marcar_false: 'Se borró la copia pública, pero la base no confirmó el retiro.',
 };
@@ -261,9 +301,16 @@ export async function reintentarRetiroPublico(id: string): Promise<ActionResult>
   if (!row.imagen_sha256 || privHash !== row.imagen_sha256) {
     return { ok: false, message: 'La copia privada no coincide con el hash registrado. No se borró nada.' };
   }
-  const pub = await download(supabase, PUBLIC_BUCKET, publicPath);
-  if (pub && (pub.buf.length !== priv.buf.length || sha256(pub.buf) !== privHash)) {
-    return { ok: false, message: 'La copia privada no coincide con la pública. No se borró nada.' };
+  // Si el objeto público aún existe, debe ser idéntico a la copia privada; si ya no existe, se continúa.
+  const pubState = await objectState(supabase, PUBLIC_BUCKET, publicPath);
+  if (pubState === 'permiso' || pubState === 'conexion') {
+    return { ok: false, message: STAGE_MESSAGE[pubState === 'permiso' ? 'verificacion_permiso' : 'verificacion_conexion'] };
+  }
+  if (pubState === 'existe') {
+    const pub = await download(supabase, PUBLIC_BUCKET, publicPath);
+    if (!pub || pub.buf.length !== priv.buf.length || sha256(pub.buf) !== privHash) {
+      return { ok: false, message: 'La copia privada no coincide con la pública. No se borró nada.' };
+    }
   }
 
   const res = await retirePublicCopy(supabase, id, publicPath);
