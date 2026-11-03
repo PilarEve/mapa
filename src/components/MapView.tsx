@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -14,11 +14,13 @@ import HeatmapLayer from './HeatmapLayer';
 import ReportForm from './ReportForm';
 import { Plus, ListFilter, X, Loader2, ChevronRight, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { buildActivityItems, getNewsDate, getReportDate, matchesDateRange, type ActivityItem } from '@/lib/activity';
 import SearchBar from './SearchBar';
 import CustomZoomControl from './CustomZoomControl';
 
 
 const ASUNCION_CENTER: [number, number] = [-25.2855, -57.6150];
+const SELECTED_ITEM_ZOOM = 16;
 
 const BASE_MAPS = {
   light: {
@@ -52,6 +54,18 @@ export default function MapView() {
   const [mapRef, setMapRef] = useState<L.Map | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeBaseMap, setActiveBaseMap] = useState<'voyager' | 'light' | 'satellite'>('light');
+  const itemMarkers = useRef(new Map<string, L.Marker>());
+  const cancelPendingSelection = useRef<(() => void) | null>(null);
+
+  const handleMarkerChange = useCallback((key: string, marker: L.Marker | null) => {
+    if (marker) {
+      itemMarkers.current.set(key, marker);
+    } else {
+      itemMarkers.current.delete(key);
+    }
+  }, []);
+
+  useEffect(() => () => cancelPendingSelection.current?.(), []);
 
   // Ajustar visibilidad inicial según tamaño de pantalla
   useEffect(() => {
@@ -140,7 +154,7 @@ export default function MapView() {
             lng: Number(dbReport.longitud),
             description: dbReport.descripcion || 'Sin descripción',
             impactTags: dbReport.afectaciones || [],
-            dateTime: dbReport.creado_en || new Date().toISOString(),
+            dateTime: dbReport.creado_en || '',
             imageUrl: dbReport.imagen_url || undefined,
             status: (dbReport.estado || 'pendiente') as Report['status'],
             archivoTipo: dbReport.archivo_tipo || null
@@ -240,57 +254,20 @@ export default function MapView() {
 
       const matchStatus = selectedStatuses.includes(report.status);
 
-      let matchDate = true;
-      if (selectedDateRange !== 'todo') {
-        const dateVal = report.dateTime ? new Date(report.dateTime) : null;
-        if (!dateVal || isNaN(dateVal.getTime())) {
-          matchDate = false;
-        } else {
-          const now = new Date();
-          if (selectedDateRange === 'hoy') {
-            const startOfToday = new Date();
-            startOfToday.setHours(0, 0, 0, 0);
-            matchDate = dateVal >= startOfToday;
-          } else if (selectedDateRange === '7dias') {
-            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            matchDate = dateVal >= sevenDaysAgo;
-          } else if (selectedDateRange === '30dias') {
-            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            matchDate = dateVal >= thirtyDaysAgo;
-          }
-        }
-      }
-
-      return matchTags && matchStatus && matchDate;
+      return matchTags && matchStatus && matchesDateRange(getReportDate(report), selectedDateRange);
     });
   }, [reports, showReports, selectedTags, selectedStatuses, selectedDateRange]);
 
   const filteredNews = useMemo(() => {
     if (!showNews) return [];
-    return news.filter(item => {
-      let matchDate = true;
-      if (selectedDateRange !== 'todo') {
-        const dateVal = item.fecha_publicacion ? new Date(item.fecha_publicacion) : null;
-        if (!dateVal || isNaN(dateVal.getTime())) {
-          matchDate = false;
-        } else {
-          const now = new Date();
-          if (selectedDateRange === 'hoy') {
-            const startOfToday = new Date();
-            startOfToday.setHours(0, 0, 0, 0);
-            matchDate = dateVal >= startOfToday;
-          } else if (selectedDateRange === '7dias') {
-            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            matchDate = dateVal >= sevenDaysAgo;
-          } else if (selectedDateRange === '30dias') {
-            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            matchDate = dateVal >= thirtyDaysAgo;
-          }
-        }
-      }
-      return matchDate;
-    });
+    return news.filter(item => matchesDateRange(getNewsDate(item), selectedDateRange));
   }, [news, showNews, selectedDateRange]);
+
+  // Única fuente de los elementos visibles: de aquí salen tanto los marcadores como la lista lateral.
+  const activityItems = useMemo(
+    () => buildActivityItems(filteredReports, filteredNews),
+    [filteredReports, filteredNews]
+  );
 
   const handleAddReport = (newReport: Report) => {
     setReports(prev => [newReport, ...prev]);
@@ -300,11 +277,41 @@ export default function MapView() {
     if (mapRef) mapRef.setView([newReport.lat, newReport.lng], 15);
   };
 
-  const handleSelectReportFromSidebar = (report: Report) => {
-    if (mapRef) {
-      mapRef.setView([report.lat, report.lng], 16);
-      if (window.innerWidth < 768) setIsSidebarOpen(false);
-    }
+  const handleSelectItemFromSidebar = (item: ActivityItem) => {
+    if (!mapRef) return;
+    const map = mapRef;
+    const target = L.latLng(item.lat, item.lng);
+    let retried = false;
+
+    const onMoveEnd = () => {
+      const centered =
+        map.getZoom() === SELECTED_ITEM_ZOOM &&
+        map.latLngToContainerPoint(target).distanceTo(map.getSize().divideBy(2)) <= 2;
+
+      // Leaflet ignora setView durante una animación de zoom: se reintenta al terminar.
+      if (!centered && !retried) {
+        retried = true;
+        map.once('moveend', onMoveEnd);
+        map.setView(target, SELECTED_ITEM_ZOOM);
+        return;
+      }
+
+      cancelPendingSelection.current = null;
+      // El marcador se busca al llegar: un filtro o el mapa de calor pudieron quitarlo durante el movimiento.
+      const marker = itemMarkers.current.get(item.key);
+      if (marker?.getPopup() && map.hasLayer(marker)) marker.openPopup();
+    };
+
+    cancelPendingSelection.current?.();
+    map.closePopup();
+    // Detener un paneo en curso antes de escuchar: al cortarse dispara un moveend que no es de esta selección.
+    map.stop();
+    cancelPendingSelection.current = () => map.off('moveend', onMoveEnd);
+    // Registrar antes de setView: si no hay movimiento, moveend se dispara de forma síncrona.
+    map.once('moveend', onMoveEnd);
+    map.setView(target, SELECTED_ITEM_ZOOM);
+
+    if (window.innerWidth < 768) setIsSidebarOpen(false);
   };
 
   const handleSelectLocation = (lat: number, lon: number) => {
@@ -339,7 +346,7 @@ export default function MapView() {
           className={`md:hidden bg-white text-slate-700 font-bold py-3 px-4 rounded-full shadow-lg flex items-center gap-2 transition-all transform active:scale-95 border border-slate-200 cursor-pointer ${isSidebarOpen ? 'bg-slate-100' : ''}`}
         >
           {isSidebarOpen ? <X size={18} /> : <ListFilter size={18} />}
-          <span className="text-xs font-semibold">{isSidebarOpen ? 'Cerrar Lista' : 'Ver Reportes'}</span>
+          <span className="text-xs font-semibold">{isSidebarOpen ? 'Cerrar Lista' : 'Ver Actividad'}</span>
         </button>
 
         {/* Botón Flotante para Nuevo Reporte */}
@@ -361,7 +368,7 @@ export default function MapView() {
         />
       )}
 
-      {/* Sidebar de Lista de Reportes */}
+      {/* Sidebar de Actividad Reciente */}
       <div className={`
         fixed top-16 md:top-0 left-0 h-[calc(100dvh-4rem)] md:h-full z-[2500] md:z-10 md:relative
         transform transition-all duration-300 ease-in-out
@@ -371,15 +378,15 @@ export default function MapView() {
         }
       `}>
         <SidebarReports 
-          reports={filteredReports} 
-          onSelectReport={handleSelectReportFromSidebar} 
+          items={activityItems}
+          onSelectItem={handleSelectItemFromSidebar}
           onCollapse={() => setIsSidebarOpen(false)}
         />
       </div>
 
       {/* Contenedor Principal del Mapa */}
       <div className="flex-1 min-w-0 relative h-full overflow-hidden">
-        {/* Botón flotante para abrir el sidebar (Reportes Recientes) */}
+        {/* Botón flotante para abrir el sidebar (Actividad reciente) */}
         <button
           onClick={() => setIsSidebarOpen(true)}
           className={`fixed top-[52px] md:top-[76px] z-[3000] bg-white/95 backdrop-blur-md text-slate-800 font-bold h-9 px-2.5 md:h-auto md:py-1.5 md:px-2.5 rounded-xl shadow-sm flex items-center justify-center gap-1.5 md:gap-2 border border-slate-200/60 cursor-pointer transition-all duration-300
@@ -389,13 +396,13 @@ export default function MapView() {
             }
             left-3
           `}
-          title="Mostrar reportes recientes"
-          aria-label="Mostrar reportes recientes"
+          title="Mostrar actividad reciente"
+          aria-label="Mostrar actividad reciente"
         >
           <AlertTriangle className="text-blue-600 shrink-0" size={16} />
-          <span className="text-xs font-bold hidden md:inline">Reportes Recientes</span>
+          <span className="text-xs font-bold hidden md:inline">Actividad reciente</span>
           <span className="bg-blue-50 text-blue-700 text-[11px] font-extrabold px-1.5 py-0.5 rounded-full border border-blue-100 shrink-0">
-            {filteredReports.length}
+            {activityItems.length}
           </span>
           <ChevronRight size={14} className="text-slate-400 hidden md:inline" />
         </button>
@@ -445,12 +452,12 @@ export default function MapView() {
             maxZoom={19}
           />
 
-          {!isHeatmapVisible && filteredReports.map(report => (
-            <ReportMarker key={report.id} report={report} />
-          ))}
-
-          {!isHeatmapVisible && filteredNews.map(noticia => (
-            <NewsMarker key={`news-${noticia.id}`} news={noticia} />
+          {!isHeatmapVisible && activityItems.map(item => (
+            item.kind === 'reporte' ? (
+              <ReportMarker key={item.key} report={item.report} markerKey={item.key} onMarkerChange={handleMarkerChange} />
+            ) : (
+              <NewsMarker key={item.key} news={item.news} markerKey={item.key} onMarkerChange={handleMarkerChange} />
+            )
           ))}
 
           <HeatmapLayer 

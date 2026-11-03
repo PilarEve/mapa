@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { NoticiaHistorica } from '../types/report';
 import { format } from 'date-fns';
 import { Calendar, ExternalLink, MapPin, AlertCircle, FileText } from 'lucide-react';
+import { getNewsDate, POPUP_AUTOPAN_PADDING_TOP_LEFT } from '@/lib/activity';
 
 const createNewsIcon = () => {
   const svgIcon = `
@@ -28,9 +29,18 @@ const NEWS_ICON = createNewsIcon();
 
 interface NewsMarkerProps {
   news: NoticiaHistorica;
+  /** Clave con la que se registra el marcador, para poder abrir su popup desde fuera. */
+  markerKey?: string;
+  onMarkerChange?: (key: string, marker: L.Marker | null) => void;
 }
 
-export default function NewsMarker({ news }: NewsMarkerProps) {
+export default function NewsMarker({ news, markerKey, onMarkerChange }: NewsMarkerProps) {
+  const markerRef = useCallback(
+    (marker: L.Marker | null) => {
+      if (markerKey) onMarkerChange?.(markerKey, marker);
+    },
+    [markerKey, onMarkerChange]
+  );
   const icon = useMemo(() => NEWS_ICON, []);
   
   const hasValue = (val: string | undefined | null) => Boolean(val && val.trim() !== "");
@@ -38,17 +48,13 @@ export default function NewsMarker({ news }: NewsMarkerProps) {
   const hasDescription = hasValue(news.descripcion) && news.descripcion?.trim() !== news.titulo?.trim();
 
   const formattedDate = useMemo(() => {
-    if (!news.fecha_publicacion) return null;
-    try {
-      return format(new Date(news.fecha_publicacion), 'dd/MM/yyyy');
-    } catch {
-      return news.fecha_publicacion;
-    }
-  }, [news.fecha_publicacion]);
+    const date = getNewsDate(news);
+    return date ? format(date, 'dd/MM/yyyy') : news.fecha_publicacion || null;
+  }, [news]);
 
   return (
-    <Marker position={[news.latitud, news.longitud]} icon={icon}>
-      <Popup className="report-popup custom-news-popup">
+    <Marker ref={markerRef} position={[news.latitud, news.longitud]} icon={icon}>
+      <Popup className="report-popup custom-news-popup" autoPanPaddingTopLeft={POPUP_AUTOPAN_PADDING_TOP_LEFT}>
         <div className="w-[260px] sm:w-[300px] max-w-[80vw] p-2.5 flex flex-col gap-2 font-sans">
           
           {/* Header con insignia */}
