@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Report } from '../types/report';
 import { format } from 'date-fns';
 import { Calendar, AlertCircle, CheckCircle2, Clock, XCircle, Image as ImageIcon } from 'lucide-react';
+import { POPUP_AUTOPAN_PADDING_TOP_LEFT } from '@/lib/activity';
 
 const createReportIcon = (isPending: boolean) => {
   const fillColor = isPending ? '#d97706' : '#2563eb';
@@ -37,9 +38,18 @@ const PENDING_ICON = createReportIcon(true);
 
 interface ReportMarkerProps {
   report: Report;
+  /** Clave con la que se registra el marcador, para poder abrir su popup desde fuera. */
+  markerKey?: string;
+  onMarkerChange?: (key: string, marker: L.Marker | null) => void;
 }
 
-export default function ReportMarker({ report }: ReportMarkerProps) {
+export default function ReportMarker({ report, markerKey, onMarkerChange }: ReportMarkerProps) {
+  const markerRef = useCallback(
+    (marker: L.Marker | null) => {
+      if (markerKey) onMarkerChange?.(markerKey, marker);
+    },
+    [markerKey, onMarkerChange]
+  );
   const isPending = report.status === 'pendiente';
   const icon = useMemo(() => (isPending ? PENDING_ICON : VERIFIED_ICON), [isPending]);
   const [imageError, setImageError] = useState(false);
@@ -82,13 +92,13 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
     try {
       return format(new Date(report.dateTime), 'dd/MM/yyyy HH:mm');
     } catch {
-      return report.dateTime;
+      return report.dateTime || 'Sin fecha';
     }
   }, [report.dateTime]);
 
   return (
-    <Marker position={[report.lat, report.lng]} icon={icon}>
-      <Popup className="report-popup custom-report-popup">
+    <Marker ref={markerRef} position={[report.lat, report.lng]} icon={icon}>
+      <Popup className="report-popup custom-report-popup" autoPanPaddingTopLeft={POPUP_AUTOPAN_PADDING_TOP_LEFT}>
         <div className="w-[260px] sm:w-[300px] max-w-[80vw] p-2.5 flex flex-col gap-2 font-sans">
 
           {/* Header con insignias unificadas */}
