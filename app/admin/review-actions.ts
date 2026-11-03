@@ -146,13 +146,25 @@ export async function rechazarReporte(id: string): Promise<ActionResult> {
   }
   const originalHash = sha256(original.buf);
 
-  // 1. Copia al bucket privado (sin upsert: nunca sobrescribe) o reutiliza una previa idéntica.
-  const up = await supabase.storage.from(PRIVATE_BUCKET).upload(privatePath, original.buf, {
-    contentType: mime,
-    upsert: false,
-  });
-  if (up.error && !/exist|duplicate/i.test(up.error.message)) {
-    return { ok: false, message: 'No se pudo copiar la fotografía al bucket privado. No se realizaron cambios.' };
+  // Un reporte restaurado ya tiene hash registrado: su foto pública debe seguir siendo ese original.
+  if (row.imagen_sha256 && originalHash !== row.imagen_sha256) {
+    return { ok: false, message: 'La fotografía pública no coincide con el original registrado. No se realizaron cambios.' };
+  }
+
+  // 1. Reutiliza la copia privada si ya existe (rechazo anterior o intento interrumpido).
+  //    Si no existe, la crea sin upsert: nunca sobrescribe. En ambos casos se verifica por hash.
+  const privState = await objectState(supabase, PRIVATE_BUCKET, privatePath);
+  if (privState === 'permiso' || privState === 'conexion') {
+    return { ok: false, message: 'No se pudo consultar el bucket privado. No se realizaron cambios.' };
+  }
+  if (privState === 'inexistente') {
+    const up = await supabase.storage.from(PRIVATE_BUCKET).upload(privatePath, original.buf, {
+      contentType: mime,
+      upsert: false,
+    });
+    if (up.error && !/exist|duplicate/i.test(up.error.message)) {
+      return { ok: false, message: 'No se pudo copiar la fotografía al bucket privado. No se realizaron cambios.' };
+    }
   }
   const copy = await download(supabase, PRIVATE_BUCKET, privatePath);
   if (!copy || copy.buf.length !== original.buf.length || sha256(copy.buf) !== originalHash) {
@@ -280,6 +292,158 @@ const STAGE_MESSAGE: Record<RetireStage, string> = {
   marcar_error: 'Se borró la copia pública, pero falló el registro del retiro.',
   marcar_false: 'Se borró la copia pública, pero la base no confirmó el retiro.',
 };
+
+/**
+ * Restauración segura (rechazado -> pendiente). Se puede reintentar sin riesgo. Orden:
+ *  1. Verificar el original privado contra el SHA-256 registrado.
+ *  2. Si ya hay un objeto en la ruta pública, debe ser idéntico; nunca se sobrescribe.
+ *  3. Marcar el retiro como pendiente vía RPC: si algo falla desde aquí, el panel ofrece
+ *     "Reintentar retiro" y la política de borrado existente puede retirar la copia.
+ *  4. Subir los mismos bytes (EXIF intacto), sin upsert, y verificarlos por hash.
+ *  5. Cambiar el estado vía RPC atómica, que también registra la auditoría.
+ * El original privado se conserva siempre como respaldo.
+ */
+export async function restaurarReporte(id: string): Promise<ActionResult> {
+  const { supabase } = await requireAdmin();
+  // La recuperación de un fallo usa el retiro de copia pública, que depende de esta configuración.
+  if (!rejectEnabled()) {
+    return { ok: false, message: 'La restauración requiere que el rechazo esté habilitado. No se realizaron cambios.' };
+  }
+  if (!ID_RE.test(id)) return { ok: false, message: 'Identificador inválido.' };
+
+  const row = await fetchRow(supabase, id);
+  if (!row) return { ok: false, message: 'Reporte no encontrado.' };
+  if (row.estado !== 'rechazado') {
+    revalidatePath('/admin');
+    return { ok: false, message: 'El reporte ya no está rechazado. Se actualizó la lista.' };
+  }
+  if (!row.imagen_privada_path || !row.imagen_sha256) {
+    return { ok: false, message: 'Este reporte no tiene copia privada registrada. No se realizaron cambios.' };
+  }
+  const publicPath = publicPathFromUrl(row.imagen_url);
+  if (!publicPath) {
+    return { ok: false, message: 'No se pudo identificar la ruta pública de la fotografía. No se realizaron cambios.' };
+  }
+
+  // 1. Integridad del original
+  const original = await download(supabase, PRIVATE_BUCKET, row.imagen_privada_path);
+  if (!original) {
+    return { ok: false, message: 'No se pudo leer la fotografía original en el bucket privado. No se realizaron cambios.' };
+  }
+  if (sha256(original.buf) !== row.imagen_sha256) {
+    return { ok: false, message: 'La fotografía original no coincide con el hash registrado. No se realizaron cambios.' };
+  }
+  const mime = resolveMime(original.type, publicPath);
+  if (!mime) return { ok: false, message: 'Formato de archivo no admitido. No se realizaron cambios.' };
+
+  const isIdenticalToOriginal = async () => {
+    const copy = await download(supabase, PUBLIC_BUCKET, publicPath);
+    return !!copy && copy.buf.length === original.buf.length && sha256(copy.buf) === row.imagen_sha256;
+  };
+
+  // 2. Identidad de un objeto público ya existente
+  const pubState = await objectState(supabase, PUBLIC_BUCKET, publicPath);
+  if (pubState === 'permiso' || pubState === 'conexion') {
+    return {
+      ok: false,
+      message: `${STAGE_MESSAGE[pubState === 'permiso' ? 'verificacion_permiso' : 'verificacion_conexion']} No se realizaron cambios.`,
+    };
+  }
+  if (pubState === 'existe' && !(await isIdenticalToOriginal())) {
+    return { ok: false, message: 'Ya existe un archivo público distinto en esa ruta. No se sobrescribió ni se realizaron cambios.' };
+  }
+
+  // 3. Registrar la intención antes de exponer la fotografía
+  const prep = await supabase.rpc('preparar_restauracion_reporte', { p_id: id });
+  if (prep.error) {
+    console.error('[admin/restaurar] preparar falló', { reporteId: id, code: prep.error.code, message: prep.error.message });
+    return {
+      ok: false,
+      message:
+        prep.error.code === 'PGRST202'
+          ? 'Falta configurar la restauración en Supabase: ejecutar supabase/manual/reportes_restauracion.sql.'
+          : `No se pudo iniciar la restauración. No se realizaron cambios. (código: ${prep.error.code ?? 'desconocido'})`,
+    };
+  }
+  if (prep.data !== true) {
+    revalidatePath('/admin');
+    return { ok: false, message: 'El reporte ya no está rechazado. Se actualizó la lista.' };
+  }
+
+  const uploadPublicCopy = () =>
+    supabase.storage.from(PUBLIC_BUCKET).upload(publicPath, original.buf, { contentType: mime, upsert: false });
+
+  /** Vuelve a dejar la fotografía fuera del bucket público. La política de borrado solo lo permite si sigue rechazado. */
+  const undoPublicCopy = async (reason: string): Promise<ActionResult> => {
+    // Otro retiro simultáneo pudo marcarla como retirada, y la política de borrado exige lo contrario.
+    await supabase.rpc('preparar_restauracion_reporte', { p_id: id });
+    const retired = await retirePublicCopy(supabase, id, publicPath);
+    revalidatePath('/admin');
+    if (retired.ok) {
+      return { ok: false, message: `${reason} El reporte sigue rechazado y sin copia pública. Podés reintentar.` };
+    }
+    // Si el borrado fue denegado porque otro administrador ya lo restauró, la copia pública es correcta.
+    const latest = await fetchRow(supabase, id);
+    if (latest?.estado === 'pendiente') {
+      return { ok: true, message: 'Otro administrador ya restauró este reporte y figura en Pendientes.' };
+    }
+    return {
+      ok: false,
+      message: `${reason} El reporte sigue rechazado, pero la copia pública NO se pudo retirar (${STAGE_MESSAGE[retired.stage]}). Usá "Reintentar retiro de copia pública".`,
+    };
+  };
+
+  /** Un retiro simultáneo pudo borrar la copia justo antes de la transición. Ya en pendiente, no se puede volver a borrar. */
+  const restoredResult = async (message: string): Promise<ActionResult> => {
+    revalidatePath('/admin');
+    if ((await objectState(supabase, PUBLIC_BUCKET, publicPath)) !== 'inexistente') return { ok: true, message };
+    const up = await uploadPublicCopy();
+    if (!up.error && (await isIdenticalToOriginal())) return { ok: true, message };
+    console.error('[admin/restaurar] no se pudo reponer la copia pública', { reporteId: id, message: up.error?.message });
+    return { ok: false, message: 'El reporte volvió a Pendientes, pero su fotografía pública no está disponible. La original sigue en el bucket privado.' };
+  };
+
+  // 4. Copia pública, sin sobrescribir: otra restauración simultánea pudo crearla
+  let uploadedHere = false;
+  if (pubState === 'inexistente') {
+    const up = await uploadPublicCopy();
+    if (up.error && !/exist|duplicate/i.test(up.error.message)) {
+      console.error('[admin/restaurar] subida falló', { reporteId: id, message: up.error.message });
+      return undoPublicCopy('No se pudo copiar la fotografía al bucket público.');
+    }
+    uploadedHere = !up.error;
+  }
+  if (!(await isIdenticalToOriginal())) {
+    // Solo se retira lo subido en este intento. Otro objeto puede ser ajeno: el reintento de retiro compara el hash.
+    if (uploadedHere) return undoPublicCopy('No se pudo comprobar la copia pública.');
+    revalidatePath('/admin');
+    return {
+      ok: false,
+      message: 'No se pudo comprobar la copia pública y no se borró nada. El reporte sigue rechazado. Usá "Reintentar retiro de copia pública".',
+    };
+  }
+
+  // 5. Transición atómica
+  const { data, error } = await supabase.rpc('restaurar_reporte', { p_id: id, p_sha256: row.imagen_sha256 });
+  if (!error && data === true) {
+    return restoredResult('Reporte restaurado. Volvió a Pendientes con su fotografía pública.');
+  }
+  if (error) {
+    console.error('[admin/restaurar] RPC restaurar_reporte falló', { reporteId: id, code: error.code, message: error.message });
+  }
+
+  // La RPC pudo confirmarse aunque se perdiera la respuesta, u otro administrador pudo restaurarlo antes.
+  const current = await fetchRow(supabase, id);
+  if (current?.estado === 'pendiente') {
+    return restoredResult('El reporte ya estaba restaurado y figura en Pendientes.');
+  }
+  if (!current) {
+    // El estado es desconocido: no se borra nada. Si sigue rechazado, el panel ofrece el reintento de retiro.
+    revalidatePath('/admin');
+    return { ok: false, message: 'No se pudo confirmar el estado del reporte. Actualizá la lista: si sigue rechazado, usá "Reintentar retiro de copia pública" o volvé a restaurar.' };
+  }
+  return undoPublicCopy('No se pudo cambiar el estado del reporte.');
+}
 
 /** Reintento idempotente para rechazados cuya copia pública sigue accesible. */
 export async function reintentarRetiroPublico(id: string): Promise<ActionResult> {
