@@ -8,7 +8,12 @@ import { mockReports } from '../data/reports';
 import { Report, NoticiaHistorica } from '../types/report';
 import ReportMarker from './ReportMarker';
 import NewsMarker from './NewsMarker';
-import FilterPanel from './FilterPanel';
+import QuickFilters from './QuickFilters';
+import FilterPanel, { DEFAULT_DATE_RANGE, DEFAULT_STATUSES } from './FilterPanel';
+import { createPortal } from 'react-dom';
+import { useSearchParams } from 'next/navigation';
+import { useFiltersUI } from './FiltersUIContext';
+import { parseVista } from '@/lib/mapVista';
 import SidebarReports from './SidebarReports';
 import HeatmapLayer from './HeatmapLayer';
 import ReportForm from './ReportForm';
@@ -44,10 +49,13 @@ export default function MapView() {
   const [reports, setReports] = useState<Report[]>([]);
   const [news, setNews] = useState<NoticiaHistorica[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showReports, setShowReports] = useState<boolean>(true);
-  const [showNews, setShowNews] = useState<boolean>(true);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['validado']);
-  const [selectedDateRange, setSelectedDateRange] = useState<string>('todo');
+  // La categoría visible se deriva de la URL (?vista=reportes|noticias); sin parámetro, se muestra todo.
+  const vista = parseVista(useSearchParams().get('vista'));
+  const showReports = vista !== 'noticias';
+  const showNews = vista !== 'reportes';
+  const { isOpen: isFiltersOpen, close: closeFilters, anchorEl: filtersAnchor } = useFiltersUI();
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(DEFAULT_STATUSES);
+  const [selectedDateRange, setSelectedDateRange] = useState<string>(DEFAULT_DATE_RANGE);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isHeatmapVisible, setIsHeatmapVisible] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
@@ -66,6 +74,12 @@ export default function MapView() {
   }, []);
 
   useEffect(() => () => cancelPendingSelection.current?.(), []);
+
+  // Al salir del mapa, el panel de filtros no debe quedar marcado como abierto.
+  useEffect(() => closeFilters, [closeFilters]);
+
+  // El mapa de calor solo representa reportes: en la vista de noticias no se aplica (el valor guardado se conserva).
+  const isHeatmapActive = isHeatmapVisible && vista !== 'noticias';
 
   // Ajustar visibilidad inicial según tamaño de pantalla
   useEffect(() => {
@@ -269,6 +283,13 @@ export default function MapView() {
     [filteredReports, filteredNews]
   );
 
+  // Restablece solo filtros de estado, fecha y afectaciones: no cambia la categoría, el mapa base ni el mapa de calor.
+  const handleResetFilters = () => {
+    setSelectedStatuses(DEFAULT_STATUSES);
+    setSelectedDateRange(DEFAULT_DATE_RANGE);
+    setSelectedTags([]);
+  };
+
   const handleAddReport = (newReport: Report) => {
     setReports(prev => [newReport, ...prev]);
     // Asegurar que el reporte recién enviado sea visible para el usuario activando la vista de pendientes
@@ -407,33 +428,45 @@ export default function MapView() {
           <ChevronRight size={14} className="text-slate-400 hidden md:inline" />
         </button>
 
-        {/* Barra de Búsqueda de Ubicación */}
-        <SearchBar 
-          onSelectLocation={handleSelectLocation}
-          className={`fixed top-[52px] md:top-[76px] left-1/2 -translate-x-1/2 z-[3000] transition-all duration-300 
-            w-[calc(100vw-110px)] max-w-[200px] sm:max-w-[240px] md:w-64 lg:w-72 md:max-w-none
-            ${isSidebarOpen ? 'hidden md:block' : 'block'}
+        {/* Bloque flotante superior: buscador arriba, afectaciones rápidas debajo.
+            Es un único contenedor absoluto dentro del mapa (queda bajo el header y centrado en el espacio libre
+            junto al sidebar), así que ambos controles se apilan sin superponerse. */}
+        <div
+          className={`absolute top-1 md:top-3 left-1/2 -translate-x-1/2 z-[3000] max-w-[calc(100%-1.5rem)] flex-col items-center gap-2 pointer-events-none
+            ${isSidebarOpen ? 'hidden md:flex' : 'flex'}
           `}
-        />
+        >
+          <SearchBar
+            onSelectLocation={handleSelectLocation}
+            className="pointer-events-auto w-[calc(100vw-110px)] max-w-[200px] sm:max-w-[240px] md:w-64 lg:w-72 md:max-w-none"
+          />
+          {vista !== 'noticias' && (
+            <QuickFilters
+              selectedTags={selectedTags}
+              onTagsChange={setSelectedTags}
+              className="pointer-events-auto flex max-w-full px-0.5 py-0.5"
+            />
+          )}
+        </div>
 
-        {/* Panel de Filtros */}
-        <FilterPanel 
-          showReports={showReports}
-          onShowReportsChange={setShowReports}
-          showNews={showNews}
-          onShowNewsChange={setShowNews}
-          selectedStatuses={selectedStatuses}
-          onStatusesChange={setSelectedStatuses}
-          selectedDateRange={selectedDateRange}
-          onDateRangeChange={setSelectedDateRange}
-          selectedTags={selectedTags}
-          onTagsChange={setSelectedTags}
-          isHeatmapVisible={isHeatmapVisible}
-          onToggleHeatmap={setIsHeatmapVisible}
-          activeBaseMap={activeBaseMap}
-          onChangeBaseMap={setActiveBaseMap}
-          className="fixed top-[52px] md:top-[76px] right-3 z-[3000]"
-        />
+        {/* Panel de Filtros: se renderiza dentro del ancla del botón "Filtros" del header */}
+        {isFiltersOpen && filtersAnchor && createPortal(
+          <FilterPanel
+            vista={vista}
+            selectedStatuses={selectedStatuses}
+            onStatusesChange={setSelectedStatuses}
+            selectedDateRange={selectedDateRange}
+            onDateRangeChange={setSelectedDateRange}
+            selectedTags={selectedTags}
+            onTagsChange={setSelectedTags}
+            isHeatmapVisible={isHeatmapVisible}
+            onToggleHeatmap={setIsHeatmapVisible}
+            activeBaseMap={activeBaseMap}
+            onChangeBaseMap={setActiveBaseMap}
+            onReset={handleResetFilters}
+          />,
+          filtersAnchor
+        )}
 
         <MapContainer 
           center={ASUNCION_CENTER} 
@@ -452,7 +485,7 @@ export default function MapView() {
             maxZoom={19}
           />
 
-          {!isHeatmapVisible && activityItems.map(item => (
+          {!isHeatmapActive && activityItems.map(item => (
             item.kind === 'reporte' ? (
               <ReportMarker key={item.key} report={item.report} markerKey={item.key} onMarkerChange={handleMarkerChange} />
             ) : (
@@ -462,7 +495,7 @@ export default function MapView() {
 
           <HeatmapLayer 
             reports={filteredReports} 
-            isVisible={isHeatmapVisible} 
+            isVisible={isHeatmapActive} 
           />
         </MapContainer>
       </div>
