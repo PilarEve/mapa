@@ -1,39 +1,63 @@
 "use client";
 
-import { useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import { Report } from '../types/report';
 import { format } from 'date-fns';
-import { Calendar, AlertCircle, CheckCircle2, Clock, XCircle, MapPin } from 'lucide-react';
+import { Calendar, AlertCircle, CheckCircle2, Clock, XCircle, Image as ImageIcon } from 'lucide-react';
+import { POPUP_AUTOPAN_PADDING_TOP_LEFT } from '@/lib/activity';
 
-const createReportIcon = () => {
+const createReportIcon = (isPending: boolean) => {
+  const fillColor = isPending ? '#d97706' : '#2563eb';
+  const innerDot = isPending
+    ? `<circle cx="12" cy="10" r="3" fill="#fef3c7" stroke="#b45309" stroke-width="1"></circle>`
+    : `<circle cx="12" cy="10" r="3" fill="#ffffff"></circle>`;
+
   const svgIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#2563eb" width="24" height="24" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-      <circle cx="12" cy="10" r="3" fill="#ffffff"></circle>
-    </svg>
+    <div style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25)); display: flex; align-items: center; justify-content: center;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${fillColor}" width="26" height="26" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+        ${innerDot}
+      </svg>
+    </div>
   `;
 
   return L.divIcon({
     className: 'custom-leaflet-icon bg-transparent border-0',
     html: svgIcon,
-    iconSize: [24, 24],
-    iconAnchor: [12, 24],
-    popupAnchor: [0, -24],
+    iconSize: [26, 26],
+    iconAnchor: [13, 26],
+    popupAnchor: [0, -26],
   });
 };
 
-// Instancia estática de icono para evitar recrearlo en cada renderizado
-const REPORT_ICON = createReportIcon();
+// Instancias estáticas de icono para evitar recrearlas en cada renderizado
+const VERIFIED_ICON = createReportIcon(false);
+const PENDING_ICON = createReportIcon(true);
 
 interface ReportMarkerProps {
   report: Report;
+  /** Clave con la que se registra el marcador, para poder abrir su popup desde fuera. */
+  markerKey?: string;
+  onMarkerChange?: (key: string, marker: L.Marker | null) => void;
 }
 
-export default function ReportMarker({ report }: ReportMarkerProps) {
-  const icon = useMemo(() => REPORT_ICON, []);
-  
+export default function ReportMarker({ report, markerKey, onMarkerChange }: ReportMarkerProps) {
+  const markerRef = useCallback(
+    (marker: L.Marker | null) => {
+      if (markerKey) onMarkerChange?.(markerKey, marker);
+    },
+    [markerKey, onMarkerChange]
+  );
+  const isPending = report.status === 'pendiente';
+  const icon = useMemo(() => (isPending ? PENDING_ICON : VERIFIED_ICON), [isPending]);
+  const [imageError, setImageError] = useState(false);
+
+  const isHeic = useMemo(() => {
+    return report.imageUrl ? /\.(heic|heif)(\?.*)?$/i.test(report.imageUrl) : false;
+  }, [report.imageUrl]);
+
   const hasDescription = useMemo(() => {
     return Boolean(report.description && report.description.trim() !== '' && report.description.trim().toLowerCase() !== 'sin descripción');
   }, [report.description]);
@@ -56,7 +80,7 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize">
+          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full capitalize" title="Reporte pendiente de validación">
             <Clock size={12} className="shrink-0" />
             Pendiente
           </span>
@@ -68,36 +92,59 @@ export default function ReportMarker({ report }: ReportMarkerProps) {
     try {
       return format(new Date(report.dateTime), 'dd/MM/yyyy HH:mm');
     } catch {
-      return report.dateTime;
+      return report.dateTime || 'Sin fecha';
     }
   }, [report.dateTime]);
 
   return (
-    <Marker position={[report.lat, report.lng]} icon={icon}>
-      <Popup className="report-popup custom-report-popup">
+    <Marker ref={markerRef} position={[report.lat, report.lng]} icon={icon}>
+      <Popup className="report-popup custom-report-popup" autoPanPaddingTopLeft={POPUP_AUTOPAN_PADDING_TOP_LEFT}>
         <div className="w-[260px] sm:w-[300px] max-w-[80vw] p-2.5 flex flex-col gap-2 font-sans">
-          
+
           {/* Header con insignias unificadas */}
           <div className="flex justify-between items-center gap-2 border-b border-slate-100 pb-2">
-            <span className="bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full">
+            <span className="bg-slate-100 text-slate-600 border border-slate-200/80 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md">
               Reporte Ciudadano
             </span>
             {getStatusBadge(report.status)}
           </div>
 
-          {/* Imagen o Multimedia */}
+          {/* Aviso breve y liviano de reporte pendiente */}
+          {isPending && (
+            <div className="bg-amber-50/70 border border-amber-200/60 rounded-lg px-2.5 py-1.5 text-[11px] text-amber-800 flex items-center gap-1.5 font-medium">
+              <AlertCircle size={13} className="text-amber-600 shrink-0" />
+              <span>Reporte pendiente de validación.</span>
+            </div>
+          )}
+
+          {/* Imagen o Multimedia con soporte de fallback HEIC/HEIF sin alterar el original */}
           {report.imageUrl && (
             <div className="w-full h-40 sm:h-44 relative rounded-xl overflow-hidden shadow-sm border border-slate-100 bg-slate-900 flex items-center justify-center">
               {report.archivoTipo === 'video' ? (
                 <div className="w-full h-full flex items-center justify-center bg-slate-800 text-slate-400 text-xs font-medium px-4 text-center">
                   Evidencia en formato no soportado.
                 </div>
+              ) : isHeic || imageError ? (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800 text-slate-200 p-3 text-center">
+                  <ImageIcon size={26} className="text-blue-400 mb-1.5" />
+                  <span className="text-xs font-semibold text-white">Fotografía original {isHeic ? 'HEIC/HEIF' : ''}</span>
+                  <span className="text-[10px] text-slate-400 mt-0.5 mb-2">Preservada sin compresión ni alteraciones</span>
+                  <a
+                    href={report.imageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-blue-300 hover:text-white underline font-semibold"
+                  >
+                    Abrir archivo original
+                  </a>
+                </div>
               ) : (
-                <img 
-                  src={report.imageUrl} 
-                  alt="Evidencia del reporte ciudadano" 
+                <img
+                  src={report.imageUrl}
+                  alt="Evidencia del reporte ciudadano"
                   className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                   loading="lazy"
+                  onError={() => setImageError(true)}
                 />
               )}
             </div>

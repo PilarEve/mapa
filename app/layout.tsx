@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navigation from "@/components/Navigation";
+import { FiltersUIProvider } from "@/components/FiltersUIContext";
+import { Suspense } from "react";
 
 // test
 
@@ -32,8 +34,12 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-dvh max-h-dvh overflow-hidden antialiased`}
     >
       <body className="h-dvh max-h-dvh flex flex-col overflow-hidden bg-slate-50 text-slate-900">
-        <Navigation />
-        {children}
+        <FiltersUIProvider>
+          <Suspense fallback={<div className="h-12 md:h-16 shrink-0" />}>
+            <Navigation />
+          </Suspense>
+          {children}
+        </FiltersUIProvider>
       </body>
     </html>
   );
