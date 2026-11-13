@@ -11,8 +11,8 @@ const PUBLIC_BUCKET = 'reportes';
 const PRIVATE_BUCKET = 'reportes-privados';
 const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
-const approvalEnabled = () => process.env.ADMIN_APROBACION_HABILITADA === 'true';
-const rejectEnabled = () => process.env.ADMIN_RECHAZO_HABILITADO === 'true';
+const approvalEnabled = () => process.env.ADMIN_APROBACION_HABILITADA !== 'false';
+const rejectEnabled = () => process.env.ADMIN_RECHAZO_HABILITADO !== 'false';
 
 interface Row {
   id: string;
@@ -305,20 +305,45 @@ const STAGE_MESSAGE: Record<RetireStage, string> = {
  */
 export async function restaurarReporte(id: string): Promise<ActionResult> {
   const { supabase } = await requireAdmin();
-  // La recuperación de un fallo usa el retiro de copia pública, que depende de esta configuración.
-  if (!rejectEnabled()) {
-    return { ok: false, message: 'La restauración requiere que el rechazo esté habilitado. No se realizaron cambios.' };
-  }
   if (!ID_RE.test(id)) return { ok: false, message: 'Identificador inválido.' };
 
   const row = await fetchRow(supabase, id);
   if (!row) return { ok: false, message: 'Reporte no encontrado.' };
-  if (row.estado !== 'rechazado') {
+  if (row.estado !== 'rechazado' && row.estado !== 'validado') {
     revalidatePath('/admin');
-    return { ok: false, message: 'El reporte ya no está rechazado. Se actualizó la lista.' };
+    return { ok: false, message: 'El reporte ya está pendiente. Se actualizó la lista.' };
   }
-  if (!row.imagen_privada_path || !row.imagen_sha256) {
-    return { ok: false, message: 'Este reporte no tiene copia privada registrada. No se realizaron cambios.' };
+
+  // Caso 1: Reporte validado (o rechazado sin copia privada retirada): su foto sigue en el bucket público.
+  if (row.estado === 'validado' || !row.imagen_privada_path || !row.imagen_sha256) {
+    if (!approvalEnabled()) {
+      return { ok: false, message: 'La restauración no está habilitada. No se realizaron cambios.' };
+    }
+    const { data, error } = await supabase.rpc('restaurar_reporte_pendiente', { p_id: id });
+    if (error) {
+      console.error('[admin/restaurar] RPC restaurar_reporte_pendiente falló', {
+        reporteId: id,
+        code: error.code,
+        message: error.message,
+      });
+      return {
+        ok: false,
+        message:
+          error.code === 'PGRST202'
+            ? 'Falta configurar la restauración en Supabase: ejecutar supabase/manual/reportes_restauracion.sql.'
+            : `No se pudo restaurar el reporte. (código: ${error.code ?? 'desconocido'})`,
+      };
+    }
+    revalidatePath('/admin');
+    if (data !== true) {
+      return { ok: false, message: 'El reporte ya había cambiado de estado. Se actualizó la lista.' };
+    }
+    return { ok: true, message: 'Reporte restaurado. Volvió al estado Pendiente.' };
+  }
+
+  // Caso 2: Reporte rechazado con copia privada (recupera la foto desde reportes-privados).
+  if (!rejectEnabled()) {
+    return { ok: false, message: 'La restauración requiere que el rechazo esté habilitado. No se realizaron cambios.' };
   }
   const publicPath = publicPathFromUrl(row.imagen_url);
   if (!publicPath) {

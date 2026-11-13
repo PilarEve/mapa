@@ -184,6 +184,35 @@ revoke all on function public.restaurar_reporte(text, text) from public, anon, a
 grant execute on function public.preparar_restauracion_reporte(text) to authenticated;
 grant execute on function public.restaurar_reporte(text, text) to authenticated;
 
+-- Restauración directa a 'pendiente' cuando el reporte está 'validado'
+-- (o 'rechazado' sin copia privada retirada, por lo que la foto pública sigue intacta).
+create or replace function public.restaurar_reporte_pendiente(p_id text)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare v_n integer;
+begin
+  if not private.es_administrador() then
+    raise exception 'no autorizado' using errcode = '42501';
+  end if;
+
+  update public.reportes
+     set estado = 'pendiente',
+         revisado_por = null,
+         revisado_en = null
+   where id::text = p_id
+     and (estado = 'validado' or (estado = 'rechazado' and imagen_privada_path is null));
+
+  get diagnostics v_n = row_count;
+  return v_n = 1;
+end;
+$$;
+
+revoke all on function public.restaurar_reporte_pendiente(text) from public, anon, authenticated;
+grant execute on function public.restaurar_reporte_pendiente(text) to authenticated;
+
 -- ------------------------------------------------------------------------------
 -- 3. COMPROBACIÓN (si algo falla, TODO se revierte)
 -- ------------------------------------------------------------------------------

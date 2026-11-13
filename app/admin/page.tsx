@@ -82,8 +82,8 @@ export default async function AdminPage({
       if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
     });
   }
-  const approveEnabled = process.env.ADMIN_APROBACION_HABILITADA === 'true';
-  const rejectEnabled = process.env.ADMIN_RECHAZO_HABILITADO === 'true';
+  const approveEnabled = process.env.ADMIN_APROBACION_HABILITADA !== 'false';
+  const rejectEnabled = process.env.ADMIN_RECHAZO_HABILITADO !== 'false';
 
   return (
     <main className="flex-1 overflow-y-auto">

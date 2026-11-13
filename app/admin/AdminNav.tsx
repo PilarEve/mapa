@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 const SECCIONES = [
   { key: 'reportes', label: 'Reportes ciudadanos', href: '/admin' },
+  { key: 'whatsapp', label: 'Reportes de WhatsApp', href: '/admin/whatsapp' },
   { key: 'noticias', label: 'Noticias históricas', href: '/admin/noticias' },
 ] as const;
 

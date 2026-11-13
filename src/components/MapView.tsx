@@ -150,30 +150,68 @@ export default function MapView() {
     const fetchReports = async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
-          .from('reportes')
-          .select('*')
-          .neq('estado', 'rechazado')
-          .order('creado_en', { ascending: false });
+        const [webRes, whatsappRes] = await Promise.all([
+          supabase
+            .from('reportes')
+            .select('*')
+            .neq('estado', 'rechazado')
+            .order('creado_en', { ascending: false }),
+          supabase
+            .from('reportes_whatsapp')
+            .select('*')
+            .neq('estado', 'rechazado')
+            .order('creado_en', { ascending: false }),
+        ]);
 
         if (!isMounted) return;
 
-        if (error) {
-          console.error('Error fetching reports:', error.message);
+        if (webRes.error) {
+          console.error('Error fetching reports:', webRes.error.message);
+        }
+        if (whatsappRes.error) {
+          console.error('Error fetching reportes_whatsapp:', whatsappRes.error.message);
+        }
+
+        if (webRes.error && whatsappRes.error) {
           setReports(mockReports);
-        } else if (data) {
-          const mappedReports: Report[] = data.map(dbReport => ({
-            id: dbReport.id,
-            lat: Number(dbReport.latitud),
-            lng: Number(dbReport.longitud),
-            description: dbReport.descripcion || 'Sin descripción',
-            impactTags: dbReport.afectaciones || [],
-            dateTime: dbReport.creado_en || '',
-            imageUrl: dbReport.imagen_url || undefined,
-            status: (dbReport.estado || 'pendiente') as Report['status'],
-            archivoTipo: dbReport.archivo_tipo || null
-          }));
-          setReports(mappedReports);
+        } else {
+          const mapDbRow = (dbReport: Record<string, unknown>, origen: 'web' | 'whatsapp'): Report | null => {
+            const lat = Number(dbReport.latitud);
+            const lng = Number(dbReport.longitud);
+            if (dbReport.latitud == null || dbReport.longitud == null || isNaN(lat) || isNaN(lng)) {
+              return null;
+            }
+            const rawEstado = (dbReport.estado as string) || 'pendiente';
+            const normalizedStatus = (rawEstado === 'aprobado' ? 'validado' : rawEstado) as Report['status'];
+            return {
+              id: String(dbReport.id),
+              lat,
+              lng,
+              description: (dbReport.descripcion as string) || 'Sin descripción',
+              impactTags: (dbReport.afectaciones as string[]) || [],
+              dateTime: (dbReport.creado_en as string) || '',
+              imageUrl: (dbReport.imagen_url as string) || undefined,
+              status: normalizedStatus,
+              archivoTipo: (dbReport.archivo_tipo as string) || null,
+              origen,
+            };
+          };
+
+          const mappedWeb = (webRes.data || [])
+            .map((r) => mapDbRow(r, 'web'))
+            .filter((r): r is Report => r !== null);
+
+          const mappedWhatsapp = (whatsappRes.data || [])
+            .map((r) => mapDbRow(r, 'whatsapp'))
+            .filter((r): r is Report => r !== null);
+
+          const combinedReports = [...mappedWeb, ...mappedWhatsapp].sort((a, b) => {
+            const dateA = a.dateTime ? new Date(a.dateTime).getTime() : 0;
+            const dateB = b.dateTime ? new Date(b.dateTime).getTime() : 0;
+            return dateB - dateA;
+          });
+
+          setReports(combinedReports);
         }
 
         const [datasetRes, manualRes] = await Promise.all([

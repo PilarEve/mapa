@@ -41,10 +41,11 @@ export default function ReportActions({ id, estado, needsPublicRetire, approveEn
     </p>
   );
 
-  if (estado === 'rechazado') {
+  if (estado === 'rechazado' || estado === 'validado') {
+    const canRestore = estado === 'validado' ? approveEnabled : rejectEnabled;
     return (
       <div className="space-y-2 pt-2">
-        {needsPublicRetire && (
+        {estado === 'rechazado' && needsPublicRetire && (
           <>
             <p className="text-xs text-amber-700">La copia pública de la foto aún no fue retirada.</p>
             <button
@@ -60,7 +61,9 @@ export default function ReportActions({ id, estado, needsPublicRetire, approveEn
         {confirming === 'restaurar' ? (
           <div className="space-y-2">
             <p className="text-xs font-medium text-slate-700">
-              ¿Confirmás restaurar este reporte? Volverá a Pendientes y su foto será pública otra vez.
+              {estado === 'rechazado'
+                ? '¿Confirmás restaurar este reporte? Volverá a Pendientes y su foto será pública otra vez.'
+                : '¿Confirmás restaurar este reporte? Volverá al estado Pendiente.'}
             </p>
             <div className="flex gap-2">
               <button
@@ -82,9 +85,9 @@ export default function ReportActions({ id, estado, needsPublicRetire, approveEn
         ) : (
           <button
             type="button"
-            disabled={isPending || !rejectEnabled}
+            disabled={isPending || !canRestore}
             onClick={() => setConfirming('restaurar')}
-            title={rejectEnabled ? undefined : 'Pendiente de configuración en Supabase'}
+            title={canRestore ? undefined : 'Pendiente de configuración en Supabase'}
             className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <RotateCcw size={14} /> {isPending ? 'Procesando…' : 'Restaurar'}

@@ -56,7 +56,7 @@ export function buildActivityItems(reports: Report[], news: NoticiaHistorica[]):
   const items: ActivityItem[] = [
     ...reports.map((report): ActivityItem => ({
       kind: 'reporte',
-      key: `reporte-${report.id}`,
+      key: `reporte-${report.origen ?? 'web'}-${report.id}`,
       lat: report.lat,
       lng: report.lng,
       date: getReportDate(report),
