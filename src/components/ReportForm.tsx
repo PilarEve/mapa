@@ -143,6 +143,25 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
   const [honeypot, setHoneypot] = useState('');
   const formOpenedAtRef = useRef<number | null>(null);
 
+  const manualLocationMap = useMemo(() => (
+    <MapContainer 
+      center={[-25.2855, -57.6150]} 
+      zoom={13} 
+      zoomControl={false}
+      className="w-full h-full"
+    >
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      />
+      <LocationSelector setLocation={(l, lg) => { setLat(l); setLng(lg); }} />
+      <MapUpdater lat={lat} lng={lng} />
+      {lat && lng && (
+        <Marker position={[parseFloat(lat), parseFloat(lng)]} icon={defaultIcon} />
+      )}
+    </MapContainer>
+  ), [lat, lng]);
+
   const isHeicPreview = useMemo(() => {
     if (!imageFile) return false;
     const rawExt = (imageFile.name.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -152,6 +171,28 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
   useEffect(() => {
     formOpenedAtRef.current = Date.now();
   }, []);
+
+  // Bloquear el scroll de fondo y permitir cerrar con tecla Escape
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isImagePickerOpen) {
+          setIsImagePickerOpen(false);
+        } else {
+          onClose();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isImagePickerOpen, onClose]);
 
   useEffect(() => {
     return () => {
@@ -402,18 +443,25 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[3500] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 md:p-6 transition-all">
-      <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[86vh] md:max-h-[90vh] my-auto">
+    <div 
+      className="fixed top-12 md:top-16 inset-x-0 bottom-0 z-[4500] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 md:p-6 transition-all"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-2xl md:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[calc(100%-1.5rem)] md:max-h-[calc(100%-2.5rem)] my-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         <div className="bg-gradient-to-r from-blue-700 to-blue-900 text-white px-4 py-3 md:px-6 md:py-4 flex justify-between items-center relative overflow-hidden shrink-0">
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
           <h2 className="text-base md:text-xl font-bold relative z-10 pr-2">Nuevo Reporte Ciudadano</h2>
           <button 
+            type="button"
             onClick={onClose} 
-            className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-1.5 md:p-2 rounded-full backdrop-blur-sm transition-colors relative z-10 shrink-0"
+            className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-1.5 md:p-2 rounded-full backdrop-blur-sm transition-colors relative z-10 shrink-0 cursor-pointer"
             aria-label="Cerrar formulario"
           >
-            <X size={16} className="md:w-5 md:h-5" />
+            <X size={18} className="md:w-5 md:h-5" />
           </button>
         </div>
         
@@ -471,24 +519,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
             <div className={`transition-all duration-300 ease-in-out overflow-hidden ${isMapOpen ? 'max-h-[350px] opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
               <p className="text-[10.5px] md:text-xs text-slate-500 mb-2 pt-0.5">Marcá la ubicación exacta del evento tocando o haciendo clic en el mapa.</p>
               <div className="w-full h-40 md:h-56 rounded-xl overflow-hidden border border-slate-200 relative z-0">
-                {useMemo(() => (
-                  <MapContainer 
-                    center={[-25.2855, -57.6150]} 
-                    zoom={13} 
-                    zoomControl={false}
-                    className="w-full h-full"
-                  >
-                    <TileLayer
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    />
-                    <LocationSelector setLocation={(l, lg) => { setLat(l); setLng(lg); }} />
-                    <MapUpdater lat={lat} lng={lng} />
-                    {lat && lng && (
-                      <Marker position={[parseFloat(lat), parseFloat(lng)]} icon={defaultIcon} />
-                    )}
-                  </MapContainer>
-                ), [lat, lng])}
+                {manualLocationMap}
               </div>
             </div>
           </div>
@@ -706,7 +737,7 @@ export default function ReportForm({ onClose, onSubmit }: ReportFormProps) {
         {/* Modal para seleccionar origen de fotografía */}
         {isImagePickerOpen && (
           <div 
-            className="fixed inset-0 z-[3500] bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
+            className="fixed inset-0 z-[5000] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
             onClick={() => setIsImagePickerOpen(false)}
           >
             <div 

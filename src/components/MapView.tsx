@@ -60,7 +60,7 @@ export default function MapView() {
   const [isHeatmapVisible, setIsHeatmapVisible] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
   const [mapRef, setMapRef] = useState<L.Map | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 768 : false));
   const [activeBaseMap, setActiveBaseMap] = useState<'voyager' | 'light' | 'satellite'>('light');
   const itemMarkers = useRef(new Map<string, L.Marker>());
   const cancelPendingSelection = useRef<(() => void) | null>(null);
@@ -80,17 +80,6 @@ export default function MapView() {
 
   // El mapa de calor solo representa reportes: en la vista de noticias no se aplica (el valor guardado se conserva).
   const isHeatmapActive = isHeatmapVisible && vista !== 'noticias';
-
-  // Ajustar visibilidad inicial según tamaño de pantalla
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if (window.innerWidth < 768) {
-        setIsSidebarOpen(false);
-      } else {
-        setIsSidebarOpen(true);
-      }
-    }
-  }, []);
 
   // Bloquear scroll de la ventana para mantener los controles fijos bajo el header
   useEffect(() => {
@@ -150,7 +139,7 @@ export default function MapView() {
     const fetchReports = async () => {
       try {
         setLoading(true);
-        const [webRes, whatsappRes] = await Promise.all([
+        const [webRes, whatsappRes, datasetRes, manualRes] = await Promise.all([
           supabase
             .from('reportes')
             .select('*')
@@ -161,6 +150,14 @@ export default function MapView() {
             .select('*')
             .neq('estado', 'rechazado')
             .order('creado_en', { ascending: false }),
+          supabase
+            .from('dataset_principal')
+            .select('*')
+            .order('fecha_publicacion', { ascending: false }),
+          supabase
+            .from('noticias_historicas')
+            .select('*')
+            .order('fecha_publicacion', { ascending: false }),
         ]);
 
         if (!isMounted) return;
@@ -213,19 +210,6 @@ export default function MapView() {
 
           setReports(combinedReports);
         }
-
-        const [datasetRes, manualRes] = await Promise.all([
-          supabase
-            .from('dataset_principal')
-            .select('*')
-            .order('fecha_publicacion', { ascending: false }),
-          supabase
-            .from('noticias_historicas')
-            .select('*')
-            .order('fecha_publicacion', { ascending: false })
-        ]);
-
-        if (!isMounted) return;
 
         if (datasetRes.error) {
           console.error('Error fetching dataset_principal:', datasetRes.error.message);
@@ -438,6 +422,7 @@ export default function MapView() {
       `}>
         <SidebarReports 
           items={activityItems}
+          loading={loading}
           onSelectItem={handleSelectItemFromSidebar}
           onCollapse={() => setIsSidebarOpen(false)}
         />
@@ -461,7 +446,7 @@ export default function MapView() {
           <AlertTriangle className="text-blue-600 shrink-0" size={16} />
           <span className="text-xs font-bold hidden md:inline">Actividad reciente</span>
           <span className="bg-blue-50 text-blue-700 text-[11px] font-extrabold px-1.5 py-0.5 rounded-full border border-blue-100 shrink-0">
-            {activityItems.length}
+            {loading ? '...' : activityItems.length}
           </span>
           <ChevronRight size={14} className="text-slate-400 hidden md:inline" />
         </button>
