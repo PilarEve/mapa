@@ -455,7 +455,7 @@ export default function MapView() {
             Es un único contenedor absoluto dentro del mapa (queda bajo el header y centrado en el espacio libre
             junto al sidebar), así que ambos controles se apilan sin superponerse. */}
         <div
-          className={`absolute top-1 md:top-3 left-1/2 -translate-x-1/2 z-[3000] max-w-[calc(100%-1.5rem)] flex-col items-center gap-2 pointer-events-none
+          className={`absolute top-1 md:top-3 left-1/2 -translate-x-1/2 z-[3000] w-[calc(100%-1.5rem)] max-w-xl flex flex-col items-center gap-1.5 sm:gap-2 pointer-events-none
             ${isSidebarOpen ? 'hidden md:flex' : 'flex'}
           `}
         >
@@ -467,7 +467,7 @@ export default function MapView() {
             <QuickFilters
               selectedTags={selectedTags}
               onTagsChange={setSelectedTags}
-              className="pointer-events-auto flex max-w-full px-0.5 py-0.5"
+              className="pointer-events-auto max-w-full px-0.5 py-0.5"
             />
           )}
         </div>
