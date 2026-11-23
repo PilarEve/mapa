@@ -31,9 +31,9 @@ export default function RootLayout({
     <html
       lang="es"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-dvh max-h-dvh overflow-hidden antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="h-dvh max-h-dvh flex flex-col overflow-hidden bg-slate-50 text-slate-900">
+      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">
         <FiltersUIProvider>
           <Suspense fallback={<div className="h-12 md:h-16 shrink-0" />}>
             <Navigation />

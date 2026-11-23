@@ -1,13 +1,14 @@
 "use client";
 
 import { format } from 'date-fns';
-import { AlertTriangle, AlertCircle, CheckCircle2, Clock, ChevronLeft, X } from 'lucide-react';
+import { AlertTriangle, AlertCircle, CheckCircle2, Clock, ChevronLeft, X, Loader2 } from 'lucide-react';
 import type { ActivityItem } from '@/lib/activity';
 
 interface SidebarReportsProps {
   items: ActivityItem[];
   onSelectItem: (item: ActivityItem) => void;
   onCollapse: () => void;
+  loading?: boolean;
 }
 
 const formatItemDate = (item: ActivityItem) => {
@@ -15,7 +16,7 @@ const formatItemDate = (item: ActivityItem) => {
   return format(item.date, item.kind === 'reporte' ? 'dd/MM/yyyy HH:mm' : 'dd/MM/yyyy');
 };
 
-export default function SidebarReports({ items, onSelectItem, onCollapse }: SidebarReportsProps) {
+export default function SidebarReports({ items, onSelectItem, onCollapse, loading }: SidebarReportsProps) {
   return (
     <div className="w-80 md:w-96 bg-white/95 backdrop-blur-md h-full border-r border-slate-200/50 flex flex-col shadow-[4px_0_24px_-4px_rgba(0,0,0,0.05)] z-[1000] relative">
       <div className="p-6 border-b border-slate-100 bg-white/50 backdrop-blur-sm flex items-center justify-between gap-4">
@@ -25,7 +26,14 @@ export default function SidebarReports({ items, onSelectItem, onCollapse }: Side
             Actividad reciente
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            {items.length} {items.length === 1 ? 'registro visible' : 'registros visibles'}
+            {loading ? (
+              <span className="inline-flex items-center gap-1.5 text-slate-400">
+                <Loader2 size={13} className="animate-spin text-blue-600" />
+                Cargando actividad...
+              </span>
+            ) : (
+              `${items.length} ${items.length === 1 ? 'registro visible' : 'registros visibles'}`
+            )}
           </p>
         </div>
         <button
@@ -40,7 +48,31 @@ export default function SidebarReports({ items, onSelectItem, onCollapse }: Side
       </div>
 
       <div className="sidebar-scrollable flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-        {items.map((item) => {
+        {loading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm animate-pulse space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="h-4 w-24 bg-slate-200 rounded-md" />
+                  <div className="h-4 w-16 bg-slate-100 rounded-full" />
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3.5 bg-slate-200 rounded w-full" />
+                  <div className="h-3.5 bg-slate-100 rounded w-3/4" />
+                </div>
+                <div className="flex justify-end pt-2 border-t border-slate-50">
+                  <div className="h-3 w-20 bg-slate-100 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center text-center text-slate-400 mt-16 p-6">
+            <AlertTriangle size={32} className="mb-3 opacity-20" />
+            <p className="text-sm">No se encontraron registros con los filtros seleccionados.</p>
+          </div>
+        ) : (
+          items.map((item) => {
           const isPending = item.kind === 'reporte' && item.report.status === 'pendiente';
           return (
             <div
@@ -125,13 +157,7 @@ export default function SidebarReports({ items, onSelectItem, onCollapse }: Side
               )}
             </div>
           );
-        })}
-        {items.length === 0 && (
-          <div className="flex flex-col items-center justify-center text-center text-slate-400 mt-16 p-6">
-            <AlertTriangle size={32} className="mb-3 opacity-20" />
-            <p className="text-sm">No se encontraron registros con los filtros seleccionados.</p>
-          </div>
-        )}
+        }))}
       </div>
     </div>
   );
