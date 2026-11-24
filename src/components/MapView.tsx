@@ -60,7 +60,21 @@ export default function MapView() {
   const [isHeatmapVisible, setIsHeatmapVisible] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
   const [mapRef, setMapRef] = useState<L.Map | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 768 : false));
+  // El panel siempre empieza cerrado: en móvil el usuario lo abre manualmente.
+  // En escritorio (md:) el CSS lo muestra independientemente del estado React.
+  // The sidebar visibility is controlled by `isSidebarOpen`.
+// Desktop should start open, mobile closed.
+// We initialize closed to avoid SSR mismatch, then detect desktop on client mount.
+const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+useEffect(() => {
+  if (typeof window === 'undefined') return;
+  // Detect desktop via media features: width >=768px, hover capability, fine pointer (mouse).
+  const mq = window.matchMedia('(min-width: 768px) and (hover: hover) and (pointer: fine)');
+  if (mq.matches) {
+    setIsSidebarOpen(true);
+  }
+}, []);
   const [activeBaseMap, setActiveBaseMap] = useState<'voyager' | 'light' | 'satellite'>('light');
   const itemMarkers = useRef(new Map<string, L.Marker>());
   const cancelPendingSelection = useRef<(() => void) | null>(null);
