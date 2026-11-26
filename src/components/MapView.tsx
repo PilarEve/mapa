@@ -153,7 +153,7 @@ useEffect(() => {
     const fetchReports = async () => {
       try {
         setLoading(true);
-        const [webRes, whatsappRes, datasetRes, manualRes] = await Promise.all([
+        const [webRes, whatsappRes, manualReportesRes, datasetRes, noticiasHistRes] = await Promise.all([
           supabase
             .from('reportes')
             .select('*')
@@ -164,6 +164,11 @@ useEffect(() => {
             .select('*')
             .neq('estado', 'rechazado')
             .order('creado_en', { ascending: false }),
+          supabase
+            .from('reportes_manual')
+            .select('*')
+            .eq('estado', 'validado')
+            .order('fecha_evento', { ascending: false }),
           supabase
             .from('dataset_principal')
             .select('*')
@@ -182,11 +187,14 @@ useEffect(() => {
         if (whatsappRes.error) {
           console.error('Error fetching reportes_whatsapp:', whatsappRes.error.message);
         }
+        if (manualReportesRes.error) {
+          console.error('Error fetching reportes_manual:', manualReportesRes.error.message);
+        }
 
-        if (webRes.error && whatsappRes.error) {
+        if (webRes.error && whatsappRes.error && manualReportesRes.error) {
           setReports(mockReports);
         } else {
-          const mapDbRow = (dbReport: Record<string, unknown>, origen: 'web' | 'whatsapp'): Report | null => {
+          const mapDbRow = (dbReport: Record<string, unknown>, origen: 'web' | 'whatsapp' | 'manual'): Report | null => {
             const lat = Number(dbReport.latitud);
             const lng = Number(dbReport.longitud);
             if (dbReport.latitud == null || dbReport.longitud == null || isNaN(lat) || isNaN(lng)) {
@@ -194,13 +202,17 @@ useEffect(() => {
             }
             const rawEstado = (dbReport.estado as string) || 'pendiente';
             const normalizedStatus = (rawEstado === 'aprobado' ? 'validado' : rawEstado) as Report['status'];
+            const rawDate =
+              origen === 'manual'
+                ? ((dbReport.fecha_evento as string) || (dbReport.creado_en as string) || '')
+                : ((dbReport.creado_en as string) || '');
             return {
               id: String(dbReport.id),
               lat,
               lng,
               description: (dbReport.descripcion as string) || 'Sin descripción',
               impactTags: (dbReport.afectaciones as string[]) || [],
-              dateTime: (dbReport.creado_en as string) || '',
+              dateTime: rawDate,
               imageUrl: (dbReport.imagen_url as string) || undefined,
               status: normalizedStatus,
               archivoTipo: (dbReport.archivo_tipo as string) || null,
@@ -216,7 +228,11 @@ useEffect(() => {
             .map((r) => mapDbRow(r, 'whatsapp'))
             .filter((r): r is Report => r !== null);
 
-          const combinedReports = [...mappedWeb, ...mappedWhatsapp].sort((a, b) => {
+          const mappedManual = (manualReportesRes.data || [])
+            .map((r) => mapDbRow(r, 'manual'))
+            .filter((r): r is Report => r !== null);
+
+          const combinedReports = [...mappedWeb, ...mappedWhatsapp, ...mappedManual].sort((a, b) => {
             const dateA = a.dateTime ? new Date(a.dateTime).getTime() : 0;
             const dateB = b.dateTime ? new Date(b.dateTime).getTime() : 0;
             return dateB - dateA;
@@ -228,13 +244,13 @@ useEffect(() => {
         if (datasetRes.error) {
           console.error('Error fetching dataset_principal:', datasetRes.error.message);
         }
-        if (manualRes.error) {
-          console.error('Error fetching noticias_historicas:', manualRes.error.message);
+        if (noticiasHistRes.error) {
+          console.error('Error fetching noticias_historicas:', noticiasHistRes.error.message);
         }
 
         const rawNews = [
           ...(datasetRes.data || []),
-          ...(manualRes.data || [])
+          ...(noticiasHistRes.data || [])
         ];
 
         if (rawNews.length > 0) {

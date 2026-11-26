@@ -9,8 +9,8 @@ export interface Report {
   status: 'pendiente' | 'validado' | 'rechazado';
   /** 'imagen' para reportes nuevos. 'video' se mantiene solo por retrocompatibilidad con registros existentes. */
   archivoTipo?: 'imagen' | 'video' | string | null;
-  /** Canal de origen del reporte ciudadano ('web' por defecto o 'whatsapp'). */
-  origen?: 'web' | 'whatsapp';
+  /** Canal de origen del reporte ciudadano ('web' por defecto, 'whatsapp' o 'manual'). */
+  origen?: 'web' | 'whatsapp' | 'manual';
 }
 
 export interface NoticiaHistorica {
