@@ -4,7 +4,10 @@ const SECCIONES = [
   { key: 'reportes', label: 'Reportes ciudadanos', href: '/admin' },
   { key: 'whatsapp', label: 'Reportes de WhatsApp', href: '/admin/whatsapp' },
   { key: 'noticias', label: 'Noticias históricas', href: '/admin/noticias' },
+  { key: 'manuales', label: 'Reportes manuales', href: '/admin/manuales' },
+  { key: 'carga-manual', label: 'Carga manual', href: '/admin/carga-manual' },
 ] as const;
+
 
 export default function AdminNav({ activa }: { activa: (typeof SECCIONES)[number]['key'] }) {
   return (
